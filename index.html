@@ -114,12 +114,7 @@
     });
 
     async function redirectToCheckout() {
-      if (STRIPE_PUBLISHABLE_KEY === 'pk_test_your_publishable_key_here') {
-        alert('Demo mode: Replace STRIPE_PUBLISHABLE_KEY with your actual Stripe publishable key to enable payments.');
-        return;
-      }
-
-      if (!stripe) {
+     if (!stripe) {
         alert('Stripe not loaded. Please check your publishable key.');
         return;
       }
