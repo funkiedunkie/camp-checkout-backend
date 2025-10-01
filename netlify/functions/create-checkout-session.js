@@ -15,7 +15,7 @@ exports.handler = async (event, context) => {
       payment_method_types: ['card'],
       line_items: line_items,
       mode: 'payment',
-      success_url: 'https://bimcampcheckout.netlify.app/camp/success?session_id={CHECKOUT_SESSION_ID}',
+      success_url: 'https://bimcampcheckout.netlify.app/camp/success',
       cancel_url: 'https://bimcampcheckout.netlify.app/camp/cancelled',
       metadata: metadata
     });
