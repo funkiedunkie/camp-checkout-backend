@@ -91,7 +91,8 @@
     // Stripe configuration - REPLACE WITH YOUR ACTUAL PUBLISHABLE KEY
     const STRIPE_PUBLISHABLE_KEY = 'pk_test_51HHwvJHkXHsAaBd2p9niUrXQx2wL4HwA24Lha8srRKQtg2USRPhhZAyUwwvuCfZccbJH0R4Fh3nG2ALQRnm1WYsR00TeLOreBf';
     let stripe;
-
+    const FUNCTION_URL = 'https://bimcampcheckout.netlify.app/.netlify/functions/create-checkout-session';
+    
     document.addEventListener('DOMContentLoaded', () => {
       const numSel = document.getElementById('numCampers');
       numSel.addEventListener('change', () => {
@@ -140,7 +141,7 @@
 
       // Create checkout session
       try {
-        const response = await fetch('/.netlify/functions/create-checkout-session', {
+        const response = await fetch(FUNCTION_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
