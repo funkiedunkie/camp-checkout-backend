@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Summer Camp Registration</title>
+  <title>Camp Registration</title>
   <style>
     :root {
       --gap: 14px;
@@ -47,7 +47,7 @@
   </style>
 </head>
 <body>
-  <h1>Summer Camp Registration</h1>
+  <h1>Camp Registration</h1>
   <div class="hint">Choose the number of campers. The form(s) will appear below and the total will update automatically.</div>
 
   <label for="numCampers"><strong>How many campers are you registering?</strong></label>
@@ -197,7 +197,7 @@
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `Summer Camp - ${firstName} ${lastName}${!isFirst ? ' (Sibling Discount)' : ''}`,
+              name: `Camp - ${firstName} ${lastName}${!isFirst ? ' (Sibling Discount)' : ''}`,
               description: `Camp registration for ${firstName} ${lastName}`
             },
             unit_amount: basePriceInCents
