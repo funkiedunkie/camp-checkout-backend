@@ -9,10 +9,22 @@
       --gap: 14px;
       --pad: 18px;
       --border: #dcdcdc;
+      --brand: #1e90ff; /* blue border color */
     }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; line-height: 1.45; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; line-height: 1.45; background:#f8fafc; }
     h1 { margin: 0 0 10px; }
     .hint { color: #555; font-size: .95rem; margin-bottom: 14px; }
+
+    /* Page container with blue border */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      border: 4px solid var(--brand);
+      border-radius: 14px;
+      padding: 22px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.06);
+    }
 
     /* Inputs */
     select, input[type="text"], input[type="number"], input[type="date"], textarea {
@@ -47,40 +59,47 @@
   </style>
 </head>
 <body>
-  <h1>Camp Registration</h1>
-  <div class="hint">Choose the number of campers. The form(s) will appear below and the total will update automatically.</div>
+  <div class="container">
+    <!-- Centered logo -->
+    <div style="text-align:center; margin-bottom:20px;">
+      <img src="camp/logo.png" alt="Bodies in Motion Logo" style="max-width:250px; height:auto;">
+    </div>
 
-  <label for="numCampers"><strong>How many campers are you registering?</strong></label>
-  <select id="numCampers" class="short">
-    <option value="1" selected="">1
-    <option value="2">2
-    <option value="3">3
-    <option value="4">4
-  </select>
+    <h1 style="text-align:center;">Camp Registration</h1>
+    <p style="text-align:center;">Choose the number of campers. The form(s) will appear below and the total will update automatically.</p>
 
-  <div id="campersContainer"></div>
+    <label for="numCampers"><strong>How many campers are you registering?</strong></label>
+    <select id="numCampers" class="short">
+      <option value="1" selected>1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+    </select>
 
-  <h2 style="margin-top:24px">Parent and Billing Information</h2>
-  <div class="grid two-col">
-    <label>Parent First Name
-      <input type="text" id="parentFirstName">
+    <div id="campersContainer"></div>
+
+    <h2 style="margin-top:24px">Parent and Billing Information</h2>
+    <div class="grid two-col">
+      <label>Parent First Name
+        <input type="text" id="parentFirstName">
+      </label>
+      <label>Parent Last Name
+        <input type="text" id="parentLastName">
+      </label>
+    </div>
+    <label style="margin-top:12px; display:block;">Billing Address
+      <input type="text" id="billingAddress">
     </label>
-    <label>Parent Last Name
-      <input type="text" id="parentLastName">
-    </label>
-  </div>
-  <label style="margin-top:12px; display:block;">Billing Address
-    <input type="text" id="billingAddress">
-  </label>
 
-  <div class="total-box">
-    Total: $<span id="total">0.00</span>
-    <span id="discountLine" class="total-small hidden">Sibling discount savings: $<span id="discountSaved">0.00</span></span>
-  </div>
+    <div class="total-box">
+      Total: $<span id="total">0.00</span>
+      <span id="discountLine" class="total-small hidden">Sibling discount savings: $<span id="discountSaved">0.00</span></span>
+    </div>
 
-  <button id="checkoutButton" style="background: #635bff; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; margin-top: 16px; cursor: pointer; display: none;">
-    Proceed to Checkout
-  </button>
+    <button id="checkoutButton" style="background: #635bff; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; margin-top: 16px; cursor: pointer; display: none;">
+      Proceed to Checkout
+    </button>
+  </div>
 
   <script src="https://js.stripe.com/v3/"></script>
   <script>
@@ -88,11 +107,12 @@
     const SIBLING_DISCOUNT_RATE = 0.10; // 10% off for campers 2+
     let CAMPER_STATE = {}; // persist user-typed values between re-renders
 
-    // Stripe configuration - REPLACE WITH YOUR ACTUAL PUBLISHABLE KEY
+    // Stripe configuration - your actual publishable key
     const STRIPE_PUBLISHABLE_KEY = 'pk_test_51HHwvJHkXHsAaBd2p9niUrXQx2wL4HwA24Lha8srRKQtg2USRPhhZAyUwwvuCfZccbJH0R4Fh3nG2ALQRnm1WYsR00TeLOreBf';
     let stripe;
+    // Your deployed Netlify function (already working)
     const FUNCTION_URL = 'https://bimcampcheckout.netlify.app/.netlify/functions/create-checkout-session';
-    
+
     document.addEventListener('DOMContentLoaded', () => {
       const numSel = document.getElementById('numCampers');
       numSel.addEventListener('change', () => {
@@ -104,18 +124,18 @@
       renderCamperForms();
       applyState(CAMPER_STATE);
       updateTotal();
-      
+
       // Initialize Stripe
-      if (STRIPE_PUBLISHABLE_KEY !== 'pk_test_your_publishable_key_here') {
+      if (STRIPE_PUBLISHABLE_KEY) {
         stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
       }
-      
+
       // Checkout button click handler
       document.getElementById('checkoutButton').addEventListener('click', redirectToCheckout);
     });
 
     async function redirectToCheckout() {
-     if (!stripe) {
+      if (!stripe) {
         alert('Stripe not loaded. Please check your publishable key.');
         return;
       }
@@ -129,7 +149,6 @@
       // Validate required fields
       const parentFirstName = document.getElementById('parentFirstName').value.trim();
       const parentLastName = document.getElementById('parentLastName').value.trim();
-      
       if (!parentFirstName || !parentLastName) {
         alert('Please fill in the parent name fields before proceeding to checkout.');
         return;
@@ -139,44 +158,38 @@
       const lineItems = buildLineItems();
       const registrationData = gatherRegistrationData();
 
-      // Create checkout session
       try {
         const response = await fetch(FUNCTION_URL, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             line_items: lineItems,
-            customer_email: '', // Add email field if you have one
+            customer_email: '', // add email if you collect it
             metadata: {
-              registration_data: JSON.stringify(registrationData)
+              // Keep metadata small; Stripe limits values to 500 chars each
+              parent_name: `${parentFirstName} ${parentLastName}`,
+              campers_count: String(registrationData.campers.length)
             },
-            success_url: window.location.origin + '/success.html',
-            cancel_url: window.location.href
+            success_url: window.location.origin + '/camp/success/',
+            cancel_url: window.location.origin + '/camp/cancelled/'
           })
         });
 
-        const session = await response.json();
-        
-        // Redirect to Stripe Checkout
-        const result = await stripe.redirectToCheckout({
-          sessionId: session.id
-        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || 'Checkout session failed');
+        }
 
+        const session = await response.json();
+
+        // Redirect to Stripe Checkout
+        const result = await stripe.redirectToCheckout({ sessionId: session.id });
         if (result.error) {
           alert('Error: ' + result.error.message);
         }
       } catch (error) {
-        // For demo purposes, show what would happen
-        console.log('Line items that would be sent to Stripe:', lineItems);
-        console.log('Registration data:', registrationData);
-        
-        alert(`Demo Mode: In production, this would redirect to Stripe Checkout with:\n\n` +
-              `Line Items: ${lineItems.length} items\n` +
-              `Total: ${total.toFixed(2)}\n` +
-              `Customer: ${parentFirstName} ${parentLastName}\n\n` +
-              `To enable real payments, set up the /create-checkout-session endpoint on your server.`);
+        console.error('Checkout error:', error);
+        alert('Checkout error: ' + (error.message || error));
       }
     }
 
@@ -187,12 +200,12 @@
       for (let i = 1; i <= num; i++) {
         const firstName = document.querySelector(`[name="childFirst${i}"]`)?.value || 'Camper';
         const lastName = document.querySelector(`[name="childLast${i}"]`)?.value || i;
-        
+
         // Base camp fee
         const isFirst = (i === 1);
         const basePrice = BASE_PRICE * (isFirst ? 1 : (1 - SIBLING_DISCOUNT_RATE));
         const basePriceInCents = Math.round(basePrice * 100);
-        
+
         items.push({
           price_data: {
             currency: 'usd',
@@ -211,10 +224,8 @@
           items.push({
             price_data: {
               currency: 'usd',
-              product_data: {
-                name: `Before Camp Care - ${firstName} ${lastName}`,
-              },
-              unit_amount: 1800 // $18.00 in cents
+              product_data: { name: `Before Camp Care - ${firstName} ${lastName}` },
+              unit_amount: 1800
             },
             quantity: 1
           });
@@ -226,10 +237,8 @@
           items.push({
             price_data: {
               currency: 'usd',
-              product_data: {
-                name: `After Camp Care - ${firstName} ${lastName}`,
-              },
-              unit_amount: 2500 // $25.00 in cents
+              product_data: { name: `After Camp Care - ${firstName} ${lastName}` },
+              unit_amount: 2500
             },
             quantity: 1
           });
@@ -241,10 +250,8 @@
           items.push({
             price_data: {
               currency: 'usd',
-              product_data: {
-                name: `Hot Lunch - ${firstName} ${lastName}`,
-              },
-              unit_amount: 600 // $6.00 in cents
+              product_data: { name: `Hot Lunch - ${firstName} ${lastName}` },
+              unit_amount: 600
             },
             quantity: 1
           });
@@ -264,7 +271,7 @@
         campers: [],
         total: parseFloat(document.getElementById('total').textContent)
       };
-      
+
       const num = parseInt(document.getElementById('numCampers').value, 10) || 0;
       for (let i = 1; i <= num; i++) {
         const camper = {
@@ -281,7 +288,7 @@
         };
         data.campers.push(camper);
       }
-      
+
       return data;
     }
 
@@ -525,7 +532,7 @@
       document.getElementById('total').textContent = total.toFixed(2);
       const line = document.getElementById('discountLine');
       const savedEl = document.getElementById('discountSaved');
-      
+
       if (discountSaved > 0) {
         savedEl.textContent = discountSaved.toFixed(2);
         line.classList.remove('hidden');
@@ -533,7 +540,7 @@
         savedEl.textContent = '0.00';
         line.classList.add('hidden');
       }
-      
+
       // Show/hide checkout button based on total
       if (total > 0) {
         document.getElementById('checkoutButton').style.display = 'inline-block';
