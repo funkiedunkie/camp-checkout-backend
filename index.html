@@ -112,7 +112,7 @@
     const STRIPE_PUBLISHABLE_KEY = 'pk_live_51HHwvJHkXHsAaBd2i1rZtByJB18GIbUxWx3iQz4JrsV1jejOaZxPGVI30fWij6mJCZgkoRwZtMpndHRvL9vvBbgh0007i0FTs2';
     let stripe;
     // Your deployed Netlify function (already working)
-    const FUNCTION_URL = 'https://bimcampcheckout.netlify.app/.netlify/functions/create-checkout-session';
+    const FUNCTION_URL = '/.netlify/functions/create-checkout-session';
 
     document.addEventListener('DOMContentLoaded', () => {
       const numSel = document.getElementById('numCampers');
@@ -136,64 +136,86 @@
     });
 
     async function redirectToCheckout() {
-      if (!stripe) {
-        alert('Stripe not loaded. Please check your publishable key.');
-        return;
-      }
+  if (!stripe) {
+    alert('Stripe not loaded. Please check your publishable key.');
+    return;
+  }
 
-      const total = parseFloat(document.getElementById('total').textContent);
-      if (total <= 0) {
-        alert('Please add at least one camper to proceed with payment.');
-        return;
-      }
+  const total = parseFloat(document.getElementById('total').textContent || '0');
+  if (total <= 0) {
+    alert('Please add at least one camper to proceed with payment.');
+    return;
+  }
 
-      // Validate required fields
-      const parentFirstName = document.getElementById('parentFirstName').value.trim();
-      const parentLastName = document.getElementById('parentLastName').value.trim();
-      if (!parentFirstName || !parentLastName) {
-        alert('Please fill in the parent name fields before proceeding to checkout.');
-        return;
-      }
+  // Parent fields you already collect
+  const parentFirstName = document.getElementById('parentFirstName').value.trim();
+  const parentLastName  = document.getElementById('parentLastName').value.trim();
+  if (!parentFirstName || !parentLastName) {
+    alert('Please fill in the parent name fields before proceeding to checkout.');
+    return;
+  }
 
-      // Prepare line items for Stripe Checkout
-      const lineItems = buildLineItems();
-      const registrationData = gatherRegistrationData();
+  // Your existing helpers
+  const lineItems = buildLineItems();            // already defined in your file
+  const reg       = gatherRegistrationData();    // already defined in your file
 
-      try {
-        const response = await fetch(FUNCTION_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            line_items: lineItems,
-            customer_email: '', // add email if you collect it
-            metadata: {
-              // Keep metadata small; Stripe limits values to 500 chars each
-              parent_name: `${parentFirstName} ${parentLastName}`,
-              campers_count: String(registrationData.campers.length)
-            },
-            success_url: window.location.origin + '/camp/success/',
-            cancel_url: window.location.origin + '/camp/cancelled/'
-          })
-        });
+  // Pull first camper (for simple sheet columns), and basic rollups
+  const firstCamper = reg.campers[0] || {};
+  const siblings    = Math.max(0, reg.campers.length - 1);
+  const discountSaved = Number(
+    (document.getElementById('discountSaved')?.textContent || '0').replace(/[^0-9.]/g,'')
+  );
+  const subtotal = (reg.total || 0) + discountSaved;
 
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(text || 'Checkout session failed');
-        }
+  // Build a human-readable options summary per camper
+  const optionsSummary = reg.campers.map((c, i) => {
+    const opts = [];
+    if (c.beforeCare) opts.push('Before care');
+    if (c.afterCare)  opts.push('After care');
+    if (c.hotLunch)   opts.push('Lunch');
+    return opts.length ? `Camper ${i+1}: ${opts.join(', ')}` : '';
+  }).filter(Boolean);
 
-        const session = await response.json();
+  const payload = {
+    form: {
+      camperFirst: firstCamper.firstName || '',
+      camperLast:  firstCamper.lastName  || '',
+      parentName:  `${parentFirstName} ${parentLastName}`,
+      parentEmail: '',     // add if/when you collect it
+      phone: '',           // add if/when you collect it
+      week: '',            // add if/when you add a week field
+      options: optionsSummary,
+      siblings,
+      subtotal,
+      discounts: discountSaved,
+      total: reg.total || total
+    },
+    line_items: lineItems,
+    success_url: window.location.origin + '/camp/success/',
+    cancel_url:  window.location.origin + '/camp/cancelled/'
+  };
 
-        // Redirect to Stripe Checkout
-        const result = await stripe.redirectToCheckout({ sessionId: session.id });
-        if (result.error) {
-          alert('Error: ' + result.error.message);
-        }
-      } catch (error) {
-        console.error('Checkout error:', error);
-        alert('Checkout error: ' + (error.message || error));
-      }
+  try {
+    const res = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || 'Checkout session failed');
     }
 
+    const { url } = await res.json();
+    window.location.href = url; // send to Stripe Checkout
+  } catch (err) {
+    console.error('Checkout error:', err);
+    alert('Checkout error: ' + (err.message || err));
+  }
+}
+
+     
     function buildLineItems() {
       const items = [];
       const num = parseInt(document.getElementById('numCampers').value, 10) || 0;
