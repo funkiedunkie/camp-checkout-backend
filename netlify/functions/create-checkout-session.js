@@ -1,67 +1,56 @@
 // netlify/functions/create-checkout-session.js
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { appendRow } = require('./_sheets');
+const fetch = require('node-fetch'); // v2
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return { statusCode: 405, body: 'Method not allowed' };
   }
 
   try {
-    const data = JSON.parse(event.body || '{}');
-
-    // ---- form fields coming from your front-end ----
-    const {
-      camperFirst, camperLast, parentName, parentEmail, phone,
-      week, options, siblings, subtotal, discounts, total
-    } = data.form || {};
-
-    // you already build these on the client; pass them through
-    const line_items = data.line_items || [];
+    const { line_items = [], form = {}, success_url, cancel_url } = JSON.parse(event.body || '{}');
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
+      payment_method_types: ['card'],
       line_items,
-      success_url: `${data.success_url || (process.env.URL || 'https://bimcampcheckout.netlify.app')}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${data.cancel_url || (process.env.URL || 'https://bimcampcheckout.netlify.app')}/cancel`,
-      customer_email: parentEmail || undefined,
-      allow_promotion_codes: true,
+      success_url: success_url || 'https://bimcampcheckout.netlify.app/camp/success/',
+      cancel_url:  cancel_url  || 'https://bimcampcheckout.netlify.app/camp/cancelled/'
     });
 
-    // ---- one-time header (run once to seed headers, then delete) ----
-    // await appendRow([
-    //   'Timestamp','Status','SessionID','CamperFirst','CamperLast','ParentName','ParentEmail','Phone',
-    //   'Week','Options(Lunch/Care)','Siblings','Subtotal','Discounts','Total','PaymentIntent','CheckoutURL','Notes'
-    // ]);
-
-    // ---- write PENDING row keyed by Stripe session.id ----
-    const timestamp = new Date().toISOString();
-    await appendRow([
-      timestamp,
-      'PENDING',
-      session.id,
-      camperFirst || '',
-      camperLast || '',
-      parentName || '',
-      parentEmail || '',
-      phone || '',
-      week || '',
-      Array.isArray(options) ? options.join(', ') : (options || ''),
-      siblings ?? '',
-      subtotal ?? '',
-      discounts ?? '',
-      total ?? '',
-      '',                 // PaymentIntent (filled by webhook)
-      session.url || '',  // CheckoutURL
-      ''                  // Notes
-    ]);
+    // fire-and-forget log to Google Apps Script (no private key needed)
+    try {
+      await fetch(process.env.APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'PENDING',
+          sessionId: session.id,
+          checkoutUrl: session.url,
+          camperFirst: form.camperFirst || '',
+          camperLast:  form.camperLast  || '',
+          parentName:  form.parentName  || '',
+          parentEmail: form.parentEmail || '',
+          phone:       form.phone       || '',
+          week:        form.week        || '',
+          options:     form.options     || [],
+          siblings:    form.siblings    || 0,
+          subtotal:    form.subtotal    || 0,
+          discounts:   form.discounts   || 0,
+          total:       form.total       || 0
+        })
+      });
+    } catch (e) {
+      // don't block checkout if sheet logging fails
+      console.error('Apps Script logging error:', e);
+    }
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ id: session.id, url: session.url }),
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ url: session.url })
     };
-  } catch (err) {
-    console.error(err);
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+  } catch (error) {
+    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };

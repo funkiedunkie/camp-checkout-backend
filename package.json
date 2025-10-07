@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "dependencies": {
     "googleapis": "^161.0.0",
+    "node-fetch": "^2.7.0",
     "stripe": "^14.0.0"
   }
 }
