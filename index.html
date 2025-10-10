@@ -9,13 +9,12 @@
       --gap: 14px;
       --pad: 18px;
       --border: #dcdcdc;
-      --brand: #1e90ff; /* blue border color */
+      --brand: #1e90ff;
     }
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; line-height: 1.45; background:#f8fafc; }
     h1 { margin: 0 0 10px; }
     .hint { color: #555; font-size: .95rem; margin-bottom: 14px; }
 
-    /* Page container with blue border */
     .container {
       max-width: 900px;
       margin: 0 auto;
@@ -26,26 +25,21 @@
       box-shadow: 0 6px 18px rgba(0,0,0,.06);
     }
 
-    /* Inputs */
     select, input[type="text"], input[type="number"], input[type="date"], textarea {
       width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
     }
     textarea { min-height: 84px; }
     label { display: flex; flex-direction: column; gap: 6px; }
 
-    /* Camper count dropdown shorter */
     .short { width: 120px; display: inline-block; }
 
-    /* Cards */
     .camper-form { border: 1px solid var(--border); border-radius: 12px; padding: var(--pad); margin-top: 18px; background: #fff; }
     .camper-form h2 { margin: 0 0 4px; }
 
-    /* Layout grids - avoid fields touching by enforcing column min widths & gaps */
     .grid { display: grid; gap: 20px; }
     .two-col { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
     .three-col { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 
-    /* Options (checkbox/radio) inline and close to text */
     .options { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 6px; }
     .opt { display: inline-flex; align-items: center; gap: 6px; }
     .opt input { margin: 0; }
@@ -63,7 +57,6 @@
     <!-- Centered logo -->
     <div style="text-align:center; margin-bottom:20px;">
       <img src="/camp/logo.png" alt="Bodies in Motion Logo" style="max-width:250px;height:auto;display:block;margin:0 auto;">
-
     </div>
 
     <h1 style="text-align:center;">Camp Registration</h1>
@@ -92,6 +85,26 @@
       <input type="text" id="billingAddress">
     </label>
 
+    <!-- Camp fullness -->
+    <div id="fullnessWrap" style="margin:14px 0;">
+      <div id="fullnessText" style="font-weight:600;margin-bottom:6px;">Camp filling up…</div>
+      <div style="height:10px;background:#eee;border-radius:8px;overflow:hidden;">
+        <div id="fullnessBar" style="height:10px;width:10%;background:#1e90ff;"></div>
+      </div>
+      <div id="spotsText" style="font-size:13px;color:#555;margin-top:6px;"></div>
+    </div>
+
+    <!-- Promo code -->
+    <div style="margin:14px 0;">
+      <label>Promo Code (optional)
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="promoCode" placeholder="e.g., SAVE10" style="flex:1;">
+          <button type="button" id="applyPromoBtn" style="padding:8px 12px;border-radius:8px;border:1px solid #dcdcdc;background:#fff;cursor:pointer;">Apply</button>
+        </div>
+      </label>
+      <div id="promoMsg" style="margin-top:6px;font-size:13px;color:#555;"></div>
+    </div>
+
     <div class="total-box">
       Total: $<span id="total">0.00</span>
       <span id="discountLine" class="total-small hidden">Sibling discount savings: $<span id="discountSaved">0.00</span></span>
@@ -104,14 +117,29 @@
 
   <script src="https://js.stripe.com/v3/"></script>
   <script>
-    const BASE_PRICE = 84.00; // Camper 1 price
-    const SIBLING_DISCOUNT_RATE = 0.10; // 10% off for campers 2+
+    // ---------------------------------
+    // Pricing + config
+    // ---------------------------------
+    const BASE_PRICE = 84.00;             // Camper 1 price
+    const SIBLING_DISCOUNT_RATE = 0.10;   // 10% off for campers 2+
+
+    // --- Admin knobs (you adjust these) ---
+    const CAPACITY = 24;                  // total seats for this camp
+    let   REGISTERED = 8;                 // how many are actually registered (you change this per camp)
+    const FULLNESS_ALPHA = 0.25;          // curve “speed” (higher = rises faster)
+
+    // Promo codes map (code -> percent off whole order)
+    const PROMO_CODES = { SAVE10: 10, SAVE15: 15, FRIEND20: 20 };
+    let ACTIVE_PROMO_PCT = 0;
+
+    // State
     let CAMPER_STATE = {}; // persist user-typed values between re-renders
 
-    // Stripe configuration - your actual publishable key
+    // Stripe configuration - replace with your key
     const STRIPE_PUBLISHABLE_KEY = 'pk_live_51HHwvJHkXHsAaBd2i1rZtByJB18GIbUxWx3iQz4JrsV1jejOaZxPGVI30fWij6mJCZgkoRwZtMpndHRvL9vvBbgh0007i0FTs2';
     let stripe;
-    // Your deployed Netlify function (already working)
+
+    // Your deployed Netlify function
     const FUNCTION_URL = '/.netlify/functions/create-checkout-session';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -131,91 +159,129 @@
         stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
       }
 
-      // Checkout button click handler
+      // Promo listeners + fullness draw
+      document.getElementById('applyPromoBtn').addEventListener('click', applyPromo);
+      document.getElementById('promoCode').addEventListener('keydown', (e)=>{ if(e.key==='Enter') applyPromo(); });
+      updateFullness();
+
+      // Checkout button
       document.getElementById('checkoutButton').addEventListener('click', redirectToCheckout);
     });
 
-    async function redirectToCheckout() {
-  if (!stripe) {
-    alert('Stripe not loaded. Please check your publishable key.');
-    return;
-  }
+    // --------------------------
+    // Promo + fullness helpers
+    // --------------------------
+    function applyPromo() {
+      const code = (document.getElementById('promoCode').value || '').trim().toUpperCase();
+      const pct = PROMO_CODES[code] || 0;
+      ACTIVE_PROMO_PCT = pct;
+      const msg = document.getElementById('promoMsg');
+      if (pct > 0) {
+        msg.textContent = `${pct}% off applied.`;
+      } else if (code) {
+        msg.textContent = 'Promo not recognized.';
+      } else {
+        msg.textContent = '';
+      }
+      updateTotal();
+    }
+    function promoMult() {
+      return (100 - (ACTIVE_PROMO_PCT || 0)) / 100;
+    }
+    // Logarithmic fullness curve; starts at 10%, slows near 100%
+    function updateFullness() {
+      const r = Math.max(0, Math.min(REGISTERED, CAPACITY));
+      const base = 1 - Math.exp(-FULLNESS_ALPHA * r);
+      const max  = 1 - Math.exp(-FULLNESS_ALPHA * CAPACITY);
+      const curve = max > 0 ? base / max : 0;
+      const pct = Math.round(10 + 90 * curve); // 10% to ~100%
+      const left = Math.max(0, CAPACITY - r);
 
-  const total = parseFloat(document.getElementById('total').textContent || '0');
-  if (total <= 0) {
-    alert('Please add at least one camper to proceed with payment.');
-    return;
-  }
-
-  // Parent fields you already collect
-  const parentFirstName = document.getElementById('parentFirstName').value.trim();
-  const parentLastName  = document.getElementById('parentLastName').value.trim();
-  if (!parentFirstName || !parentLastName) {
-    alert('Please fill in the parent name fields before proceeding to checkout.');
-    return;
-  }
-
-  // Your existing helpers
-  const lineItems = buildLineItems();            // already defined in your file
-  const reg       = gatherRegistrationData();    // already defined in your file
-
-  // Pull first camper (for simple sheet columns), and basic rollups
-  const firstCamper = reg.campers[0] || {};
-  const siblings    = Math.max(0, reg.campers.length - 1);
-  const discountSaved = Number(
-    (document.getElementById('discountSaved')?.textContent || '0').replace(/[^0-9.]/g,'')
-  );
-  const subtotal = (reg.total || 0) + discountSaved;
-
-  // Build a human-readable options summary per camper
-  const optionsSummary = reg.campers.map((c, i) => {
-    const opts = [];
-    if (c.beforeCare) opts.push('Before care');
-    if (c.afterCare)  opts.push('After care');
-    if (c.hotLunch)   opts.push('Lunch');
-    return opts.length ? `Camper ${i+1}: ${opts.join(', ')}` : '';
-  }).filter(Boolean);
-
-  const payload = {
-    form: {
-      camperFirst: firstCamper.firstName || '',
-      camperLast:  firstCamper.lastName  || '',
-      parentName:  `${parentFirstName} ${parentLastName}`,
-      parentEmail: '',     // add if/when you collect it
-      phone: '',           // add if/when you collect it
-      week: '',            // add if/when you add a week field
-      options: optionsSummary,
-      siblings,
-      subtotal,
-      discounts: discountSaved,
-      total: reg.total || total
-    },
-    line_items: lineItems,
-    success_url: window.location.origin + '/camp/success/',
-    cancel_url:  window.location.origin + '/camp/cancelled/'
-  };
-
-  try {
-    const res = await fetch(FUNCTION_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(errText || 'Checkout session failed');
+      document.getElementById('fullnessText').textContent = `${pct}% full`;
+      document.getElementById('fullnessBar').style.width = `${pct}%`;
+      document.getElementById('spotsText').textContent = `${left} spots left`;
     }
 
-    const { url } = await res.json();
-    window.location.href = url; // send to Stripe Checkout
-  } catch (err) {
-    console.error('Checkout error:', err);
-    alert('Checkout error: ' + (err.message || err));
-  }
-}
+    // --------------------------
+    // Checkout
+    // --------------------------
+    async function redirectToCheckout() {
+      if (!stripe) {
+        alert('Stripe not loaded. Please check your publishable key.');
+        return;
+      }
 
-     
+      const total = parseFloat(document.getElementById('total').textContent || '0');
+      if (total <= 0) {
+        alert('Please add at least one camper to proceed with payment.');
+        return;
+      }
+
+      const parentFirstName = document.getElementById('parentFirstName').value.trim();
+      const parentLastName  = document.getElementById('parentLastName').value.trim();
+      if (!parentFirstName || !parentLastName) {
+        alert('Please fill in the parent name fields before proceeding to checkout.');
+        return;
+      }
+
+      const lineItems = buildLineItems();
+      const reg       = gatherRegistrationData();
+
+      const firstCamper = reg.campers[0] || {};
+      const siblings    = Math.max(0, reg.campers.length - 1);
+      const discountSaved = Number((document.getElementById('discountSaved')?.textContent || '0').replace(/[^0-9.]/g,''));
+      const subtotal = (reg.total || 0) + discountSaved;
+
+      const optionsSummary = reg.campers.map((c, i) => {
+        const opts = [];
+        if (c.beforeCare) opts.push('Before care');
+        if (c.afterCare)  opts.push('After care');
+        if (c.hotLunch)   opts.push('Lunch');
+        return opts.length ? `Camper ${i+1}: ${opts.join(', ')}` : '';
+      }).filter(Boolean);
+
+      const payload = {
+        form: {
+          camperFirst: firstCamper.firstName || '',
+          camperLast:  firstCamper.lastName  || '',
+          parentName:  `${parentFirstName} ${parentLastName}`,
+          parentEmail: '',
+          phone: '',
+          week: '',
+          options: optionsSummary,
+          siblings,
+          subtotal,
+          discounts: discountSaved,
+          total: reg.total || total
+        },
+        line_items: lineItems,
+        success_url: window.location.origin + '/camp/success/',
+        cancel_url:  window.location.origin + '/camp/cancelled/'
+      };
+
+      try {
+        const res = await fetch(FUNCTION_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(errText || 'Checkout session failed');
+        }
+
+        const { url } = await res.json();
+        window.location.href = url; // send to Stripe Checkout
+      } catch (err) {
+        console.error('Checkout error:', err);
+        alert('Checkout error: ' + (err.message || err));
+      }
+    }
+
+    // --------------------------
+    // Line items (sibling + promo applied)
+    // --------------------------
     function buildLineItems() {
       const items = [];
       const num = parseInt(document.getElementById('numCampers').value, 10) || 0;
@@ -224,9 +290,11 @@
         const firstName = document.querySelector(`[name="childFirst${i}"]`)?.value || 'Camper';
         const lastName = document.querySelector(`[name="childLast${i}"]`)?.value || i;
 
-        // Base camp fee
         const isFirst = (i === 1);
-        const basePrice = BASE_PRICE * (isFirst ? 1 : (1 - SIBLING_DISCOUNT_RATE));
+
+        // Base camp fee
+        let basePrice = BASE_PRICE * (isFirst ? 1 : (1 - SIBLING_DISCOUNT_RATE));
+        basePrice = basePrice * promoMult();
         const basePriceInCents = Math.round(basePrice * 100);
 
         items.push({
@@ -244,11 +312,14 @@
         // Before care
         const beforeCare = document.querySelector(`input[data-kind="before"][data-i="${i}"]`);
         if (beforeCare && beforeCare.checked) {
+          let amt = 18;
+          if (!isFirst) amt = amt * (1 - SIBLING_DISCOUNT_RATE);
+          amt = amt * promoMult();
           items.push({
             price_data: {
               currency: 'usd',
               product_data: { name: `Before Camp Care - ${firstName} ${lastName}` },
-              unit_amount: 1800
+              unit_amount: Math.round(amt * 100)
             },
             quantity: 1
           });
@@ -257,11 +328,14 @@
         // After care
         const afterCare = document.querySelector(`input[data-kind="after"][data-i="${i}"]`);
         if (afterCare && afterCare.checked) {
+          let amt = 25;
+          if (!isFirst) amt = amt * (1 - SIBLING_DISCOUNT_RATE);
+          amt = amt * promoMult();
           items.push({
             price_data: {
               currency: 'usd',
               product_data: { name: `After Camp Care - ${firstName} ${lastName}` },
-              unit_amount: 2500
+              unit_amount: Math.round(amt * 100)
             },
             quantity: 1
           });
@@ -270,11 +344,12 @@
         // Hot lunch
         const lunch = document.querySelector(`input[name="lunch${i}"]:checked`);
         if (lunch && lunch.value === '6') {
+          let amt = 6 * promoMult();
           items.push({
             price_data: {
               currency: 'usd',
               product_data: { name: `Hot Lunch - ${firstName} ${lastName}` },
-              unit_amount: 600
+              unit_amount: Math.round(amt * 100)
             },
             quantity: 1
           });
@@ -284,6 +359,9 @@
       return items;
     }
 
+    // --------------------------
+    // Gather data for logging
+    // --------------------------
     function gatherRegistrationData() {
       const data = {
         parent: {
@@ -315,6 +393,9 @@
       return data;
     }
 
+    // --------------------------
+    // Render + state utils
+    // --------------------------
     function renderCamperForms() {
       const num = parseInt(document.getElementById('numCampers').value, 10) || 0;
       const container = document.getElementById('campersContainer');
@@ -381,7 +462,6 @@
         container.appendChild(el);
       }
 
-      // delegated change handler for all camper sections
       container.onchange = (e) => {
         const t = e.target;
         if (!(t instanceof HTMLInputElement)) return;
@@ -406,11 +486,8 @@
         if (t.name && t.name.startsWith('allergy')) {
           const i = t.name.replace('allergy', '');
           const details = document.getElementById('allergyDetails' + i);
-          if (t.value === 'yes') {
-            details.classList.remove('hidden');
-          } else {
-            details.classList.add('hidden');
-          }
+          if (t.value === 'yes') details.classList.remove('hidden');
+          else details.classList.add('hidden');
         }
 
         // Birthdate -> Age calculation
@@ -458,7 +535,7 @@
         const allergy = document.querySelector(`input[name='allergy${i}']:checked`);
         data[i].allergy = allergy ? allergy.value : 'no';
         const allergyDetails = document.getElementById('allergyDetails' + i);
-        data[i].allergyDetails = allergyDetails ? allergyDetails.value : '';
+        data[i].allergyDetails = allergyDetails ? details.value : '';
       });
       return data;
     }
@@ -475,18 +552,14 @@
         const ageField = document.querySelector(`input[name='childAge${i}']`);
         if (ageField) ageField.value = p.childAge || (p.birthdate ? calcAge(p.birthdate) : '');
 
-        // care requirement
         checkRadio(`careReq${i}`, p.careReq || 'no');
         const panel = document.getElementById('careOptions' + i);
         if (panel) {
           if (p.careReq === 'yes') panel.classList.remove('hidden'); else panel.classList.add('hidden');
         }
-        // care boxes
         setCheckbox(`before`, i, !!p.before);
         setCheckbox(`after`, i, !!p.after);
-        // lunch
         checkRadio(`lunch${i}`, p.lunch || '0');
-        // allergy
         checkRadio(`allergy${i}`, p.allergy || 'no');
         const details = document.getElementById('allergyDetails' + i);
         if (details) {
@@ -526,30 +599,52 @@
       return isNaN(age) ? '' : String(age);
     }
 
+    // Totals (sibling discount on care too, and promo across everything)
     function updateTotal() {
       let total = 0;
       let discountSaved = 0;
       const num = parseInt(document.getElementById('numCampers').value, 10) || 0;
 
       for (let i = 1; i <= num; i++) {
-        // Base price & sibling discount
         const isFirst = (i === 1);
-        const price = BASE_PRICE * (isFirst ? 1 : (1 - SIBLING_DISCOUNT_RATE));
-        total += price;
+
+        // Base
+        let price = BASE_PRICE * (isFirst ? 1 : (1 - SIBLING_DISCOUNT_RATE));
         if (!isFirst) discountSaved += BASE_PRICE * SIBLING_DISCOUNT_RATE;
+        price = price * promoMult();
+        total += price;
 
         // Care (only if care required is yes)
         const careReqYes = document.querySelector(`input[name="careReq${i}"][value="yes"]:checked`);
         if (careReqYes) {
           const before = document.querySelector(`input[data-kind="before"][data-i="${i}"]`);
-          const after = document.querySelector(`input[data-kind="after"][data-i="${i}"]`);
-          if (before && before.checked) total += parseFloat(before.value);
-          if (after && after.checked) total += parseFloat(after.value);
+          const after  = document.querySelector(`input[data-kind="after"][data-i="${i}"]`);
+
+          if (before && before.checked) {
+            let amt = 18;
+            if (!isFirst) {
+              const saved = amt * SIBLING_DISCOUNT_RATE;
+              discountSaved += saved;
+              amt -= saved;
+            }
+            total += amt * promoMult();
+          }
+          if (after && after.checked) {
+            let amt = 25;
+            if (!isFirst) {
+              const saved = amt * SIBLING_DISCOUNT_RATE;
+              discountSaved += saved;
+              amt -= saved;
+            }
+            total += amt * promoMult();
+          }
         }
 
         // Lunch
         const lunch = document.querySelector(`input[name="lunch${i}"]:checked`);
-        if (lunch) total += parseFloat(lunch.value || '0');
+        if (lunch && lunch.value === '6') {
+          total += 6 * promoMult();
+        }
       }
 
       document.getElementById('total').textContent = total.toFixed(2);
@@ -564,12 +659,13 @@
         line.classList.add('hidden');
       }
 
-      // Show/hide checkout button based on total
-      if (total > 0) {
-        document.getElementById('checkoutButton').style.display = 'inline-block';
-      } else {
-        document.getElementById('checkoutButton').style.display = 'none';
+      if (ACTIVE_PROMO_PCT > 0) {
+        const promoMsg = document.getElementById('promoMsg');
+        if (promoMsg) promoMsg.textContent = `${ACTIVE_PROMO_PCT}% promo applied across all items.`;
       }
+
+      // Show/hide checkout button based on total
+      document.getElementById('checkoutButton').style.display = total > 0 ? 'inline-block' : 'none';
     }
   </script>
 </body>
