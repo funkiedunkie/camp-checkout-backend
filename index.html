@@ -127,7 +127,7 @@
     // --- Admin knobs (you adjust these) ---
     const CAPACITY = 40;                  // total seats for this camp
     let   REGISTERED = 8;                 // how many are actually registered (you change this per camp)
-    const FULLNESS_ALPHA = 0.25;          // curve “speed” (higher = rises faster)
+    const FULLNESS_ALPHA = 0.15;          // curve “speed” (higher = rises faster)
 
     // Promo codes map (code -> percent off whole order)
     const PROMO_CODES = { SAVE10: 10, SAVE15: 15, MEMBER20: 20, TEST99: 99 };
@@ -149,11 +149,10 @@ async function loadCapacity() {
     const r = await fetch('/.netlify/functions/capacity', { cache: 'no-store' });
     const d = await r.json();
 
-    // Use live numbers from Google Sheets
-    // (Paid seats count toward fullness; adjust if you want paid+pending)
-    REGISTERED = Number(d.paid || 0);
-    // CAPACITY might also be an env var in Netlify; prefer server value if present
-    if (d.capacity) CAPACITY = Number(d.capacity);
+    // Use live numbers from Google Sheets: count PAID + PENDING
+REGISTERED = Number((d.paid || 0) + (d.pending || 0));
+if (d.capacity) CAPACITY = Number(d.capacity);
+
 
     // Draw the bar + text using your existing curve
     updateFullness();
@@ -219,17 +218,23 @@ async function loadCapacity() {
     }
     // Logarithmic fullness curve; starts at 10%, slows near 100%
     function updateFullness() {
-      const r = Math.max(0.1 * CAPACITY, Math.min(REGISTERED, CAPACITY)); // ensures 10% baseline fullness
-      const base = 1 - Math.exp(-FULLNESS_ALPHA * r);
-      const max  = 1 - Math.exp(-FULLNESS_ALPHA * CAPACITY);
-      const curve = max > 0 ? base / max : 0;
-      const pct = Math.round(10 + 90 * curve); // 10% to ~100%
-      const left = Math.max(0, CAPACITY - r);
+  const r = Math.max(0, Math.min(REGISTERED, CAPACITY)); // clamp
+  const f = CAPACITY > 0 ? r / CAPACITY : 0;             // fraction 0..1
 
-      document.getElementById('fullnessText').textContent = `${pct}% full`;
-      document.getElementById('fullnessBar').style.width = `${pct}%`;
-      document.getElementById('spotsText').textContent = `${left} spots left`;
-    }
+  // Tune this: bigger = rises faster early, smaller = flatter early.
+  const FULLNESS_SHAPE = 3; // try 2..4 to taste
+
+  const base = 1 - Math.exp(-FULLNESS_SHAPE * f);
+  const max  = 1 - Math.exp(-FULLNESS_SHAPE * 1);        // normalize to 0..1
+  const curve = max > 0 ? base / max : 0;
+
+  const pct  = Math.round(10 + 90 * curve);              // 10%..~100%
+  const left = Math.max(0, CAPACITY - r);
+
+  document.getElementById('fullnessText').textContent = `${pct}% full`;
+  document.getElementById('fullnessBar').style.width = `${pct}%`;
+  document.getElementById('spotsText').textContent = `${left} spots left`;
+}
 
     // --------------------------
     // Checkout
@@ -480,13 +485,17 @@ async function loadCapacity() {
 
           <hr />
           <div class="group">
-            <strong>Allergies</strong>
-            <div class="options">
-              <label class="opt"><input type="radio" name="allergy${i}" value="yes" /> Yes</label>
-              <label class="opt"><input type="radio" name="allergy${i}" value="no" checked /> No</label>
-            </div>
-            <textarea id="allergyDetails${i}" class="hidden" placeholder="Please describe allergy and care requirements."></textarea>
-          </div>
+  <strong>Allergies and Behavioral Considerations</strong>
+  <div class="options">
+    <label class="opt"><input type="radio" name="allergy${i}" value="yes" /> Yes</label>
+    <label class="opt"><input type="radio" name="allergy${i}" value="no" checked /> No</label>
+  </div>
+  <textarea
+    id="allergyDetails${i}"
+    class="hidden"
+    placeholder="Please describe any allergies, medical care needs, or behavioral strategies that will help us best support your child at camp."></textarea>
+</div>
+
         `;
         container.appendChild(el);
       }
