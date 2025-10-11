@@ -60,7 +60,9 @@
     </div>
 
     <h1 style="text-align:center;">Camp Registration</h1>
-    <p style="text-align:center;">Choose the number of campers. The form(s) will appear below and the total will update automatically.</p>
+<div id="fullness" style="margin:8px 0;font-weight:700;">Checking capacity…</div>
+<p style="text-align:center;">Choose the number of campers. The form(s) will appear below and the total will update automatically.</p>
+
 
     <label for="numCampers"><strong>How many campers are you registering?</strong></label>
     <select id="numCampers" class="short">
@@ -143,30 +145,58 @@
     const FUNCTION_URL = '/.netlify/functions/create-checkout-session';
 
     document.addEventListener('DOMContentLoaded', () => {
-      const numSel = document.getElementById('numCampers');
-      numSel.addEventListener('change', () => {
-        CAMPER_STATE = captureState();
-        renderCamperForms();
-        applyState(CAMPER_STATE);
-        updateTotal();
-      });
-      renderCamperForms();
-      applyState(CAMPER_STATE);
-      updateTotal();
+async function loadCapacity() {
+  try {
+    const r = await fetch('/.netlify/functions/capacity', { cache: 'no-store' });
+    const d = await r.json();
 
-      // Initialize Stripe
-      if (STRIPE_PUBLISHABLE_KEY) {
-        stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-      }
+    // Use live numbers from Google Sheets
+    // (Paid seats count toward fullness; adjust if you want paid+pending)
+    REGISTERED = Number(d.paid || 0);
+    // CAPACITY might also be an env var in Netlify; prefer server value if present
+    if (d.capacity) CAPACITY = Number(d.capacity);
 
-      // Promo listeners + fullness draw
-      document.getElementById('applyPromoBtn').addEventListener('click', applyPromo);
-      document.getElementById('promoCode').addEventListener('keydown', (e)=>{ if(e.key==='Enter') applyPromo(); });
-      updateFullness();
+    // Draw the bar + text using your existing curve
+    updateFullness();
+  } catch (e) {
+    console.error('capacity fetch failed', e);
+    const t = document.getElementById('fullnessText');
+    if (t) t.textContent = 'Capacity unavailable';
+  }
+}
 
-      // Checkout button
-      document.getElementById('checkoutButton').addEventListener('click', redirectToCheckout);
-    });
+
+  // ✅ Run immediately
+  loadCapacity();
+
+  const numSel = document.getElementById('numCampers');
+  numSel.addEventListener('change', () => {
+    CAMPER_STATE = captureState();
+    renderCamperForms();
+    applyState(CAMPER_STATE);
+    updateTotal();
+  });
+
+  renderCamperForms();
+  applyState(CAMPER_STATE);
+  updateTotal();
+
+  // Initialize Stripe
+  if (STRIPE_PUBLISHABLE_KEY) {
+    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+  }
+
+  // Promo listeners + fullness draw
+  document.getElementById('applyPromoBtn').addEventListener('click', applyPromo);
+  document.getElementById('promoCode').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') applyPromo();
+  });
+  updateFullness();
+
+  // Checkout button
+  document.getElementById('checkoutButton').addEventListener('click', redirectToCheckout);
+});
+
 
     // --------------------------
     // Promo + fullness helpers
@@ -535,7 +565,7 @@
         const allergy = document.querySelector(`input[name='allergy${i}']:checked`);
         data[i].allergy = allergy ? allergy.value : 'no';
         const allergyDetails = document.getElementById('allergyDetails' + i);
-        data[i].allergyDetails = allergyDetails ? details.value : '';
+        data[i].allergyDetails = allergyDetails ? allergyDetails.value : '';
       });
       return data;
     }
