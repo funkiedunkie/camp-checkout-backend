@@ -98,9 +98,9 @@
 
     <!-- Promo code -->
     <div style="margin:14px 0;">
-      <label>Promo Code (optional)
+      <label>Promo Code
         <div style="display:flex;gap:8px;">
-          <input type="text" id="promoCode" placeholder="e.g., SAVE10" style="flex:1;">
+          <input type="text" id="promoCode" placeholder="" style="flex:1;">
           <button type="button" id="applyPromoBtn" style="padding:8px 12px;border-radius:8px;border:1px solid #dcdcdc;background:#fff;cursor:pointer;">Apply</button>
         </div>
       </label>
@@ -126,12 +126,12 @@
     const SIBLING_DISCOUNT_RATE = 0.10;   // 10% off for campers 2+
 
     // --- Admin knobs (you adjust these) ---
-    const CAPACITY = 24;                  // total seats for this camp
+    const CAPACITY = 40;                  // total seats for this camp
     let   REGISTERED = 8;                 // how many are actually registered (you change this per camp)
     const FULLNESS_ALPHA = 0.25;          // curve “speed” (higher = rises faster)
 
     // Promo codes map (code -> percent off whole order)
-    const PROMO_CODES = { SAVE10: 10, SAVE15: 15, FRIEND20: 20 };
+    const PROMO_CODES = { SAVE10: 10, SAVE15: 15, MEMBER20: 20, TEST99: 99 };
     let ACTIVE_PROMO_PCT = 0;
 
     // State
@@ -220,7 +220,7 @@ async function loadCapacity() {
     }
     // Logarithmic fullness curve; starts at 10%, slows near 100%
     function updateFullness() {
-      const r = Math.max(0, Math.min(REGISTERED, CAPACITY));
+      const r = Math.max(0.1 * CAPACITY, Math.min(REGISTERED, CAPACITY)); // ensures 10% baseline fullness
       const base = 1 - Math.exp(-FULLNESS_ALPHA * r);
       const max  = 1 - Math.exp(-FULLNESS_ALPHA * CAPACITY);
       const curve = max > 0 ? base / max : 0;
