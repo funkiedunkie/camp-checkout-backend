@@ -274,24 +274,29 @@ if (d.capacity) CAPACITY = Number(d.capacity);
         return opts.length ? `Camper ${i+1}: ${opts.join(', ')}` : '';
       }).filter(Boolean);
 
-      const payload = {
-        form: {
-          camperFirst: firstCamper.firstName || '',
-          camperLast:  firstCamper.lastName  || '',
-          parentName:  `${parentFirstName} ${parentLastName}`,
-          parentEmail: '',
-          phone: '',
-          week: '',
-          options: optionsSummary,
-          siblings,
-          subtotal,
-          discounts: discountSaved,
-          total: reg.total || total
-        },
-        line_items: lineItems,
-        success_url: window.location.origin + '/camp/success/',
-        cancel_url:  window.location.origin + '/camp/cancelled/'
-      };
+    const payload = {
+  // send flat fields the function expects
+  parentFirstName,
+  parentLastName,
+  parentEmail: '',
+  parentPhone: '',
+
+  camperFirstName: firstCamper.firstName || '',
+  camperLastName:  firstCamper.lastName  || '',
+
+  campName: 'Camp Registration',
+  campDate: '',
+
+  selections: optionsSummary,            // array is fine; backend can join
+  subtotal,
+  siblingDiscount: discountSaved,
+  total: reg.total || total,
+
+  // Stripe + redirects
+  line_items: lineItems,
+  success_url: window.location.origin + '/camp/success/',
+  cancel_url:  window.location.origin + '/camp/cancelled/'
+};
 
       try {
         const res = await fetch(FUNCTION_URL, {
