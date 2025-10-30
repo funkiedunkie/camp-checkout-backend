@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Camp Registration</title>
+  <style>
+    :root {
+      --gap: 14px;
+      --pad: 18px;
+      --border: #dcdcdc;
+      --brand: #1e90ff;
+    }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; line-height: 1.45; background:#f8fafc; }
+    h1 { margin: 0 0 10px; }
+    .hint { color: #555; font-size: .95rem; margin-bottom: 14px; }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      border: 4px solid var(--brand);
+      border-radius: 14px;
+      padding: 22px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.06);
+    }
+
+    select, input[type="text"], input[type="number"], input[type="date"], textarea {
+      width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+    }
+    textarea { min-height: 84px; }
+    label { display: flex; flex-direction: column; gap: 6px; }
+
+    .short { width: 120px; display: inline-block; }
+
+    .camper-form { border: 1px solid var(--border); border-radius: 12px; padding: var(--pad); margin-top: 18px; background: #fff; }
+    .camper-form h2 { margin: 0 0 4px; }
+
+    .grid { display: grid; gap: 20px; }
+    .two-col { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .three-col { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+    .options { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 6px; }
+    .opt { display: inline-flex; align-items: center; gap: 6px; }
+    .opt input { margin: 0; }
+
+    hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
+
+    .total-box { margin-top: 20px; font-size: 18px; font-weight: 700; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; display: inline-block; }
+    .total-small { font-size: 14px; font-weight: 500; color: #444; display: block; margin-top: 6px; }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Centered logo -->
+    <div style="text-align:center; margin-bottom:20px;">
+      <img src="/camp/logo.png" alt="Bodies in Motion Logo" style="max-width:250px;height:auto;display:block;margin:0 auto;">
+    </div>
+
+    <h1 style="text-align:center;">Camp Registration</h1>
+<p style="text-align:center;">Choose the number of campers. The form(s) will appear below and the total will update automatically.</p>
+
+
+    <label for="numCampers"><strong>How many campers are you registering?</strong></label>
+    <select id="numCampers" class="short">
+      <option value="1" selected>1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+    </select>
+
+    <div id="campersContainer"></div>
+
+    <h2 style="margin-top:24px">Parent and Billing Information</h2>
+    <div class="grid two-col">
+      <label>Parent First Name
+        <input type="text" id="parentFirstName">
+      </label>
+      <label>Parent Last Name
+        <input type="text" id="parentLastName">
+      </label>
+    </div>
+    <label style="margin-top:12px; display:block;">Billing Address
+      <input type="text" id="billingAddress">
+    </label>
+
+    <!-- Camp fullness -->
+    <div id="fullnessWrap" style="margin:14px 0;">
+      <div id="fullnessText" style="font-weight:600;margin-bottom:6px;">Camp filling up…</div>
+      <div style="height:10px;background:#eee;border-radius:8px;overflow:hidden;">
+        <div id="fullnessBar" style="height:10px;width:10%;background:#1e90ff;"></div>
+      </div>
+      <div id="spotsText" style="font-size:13px;color:#555;margin-top:6px;"></div>
+    </div>
+
+    <!-- Promo code -->
+    <div style="margin:14px 0;">
+      <label>Promo Code
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="promoCode" placeholder="" style="width:160px; max-width:40%;">
+          <button type="button" id="applyPromoBtn" style="padding:8px 12px;border-radius:8px;border:1px solid #dcdcdc;background:#fff;cursor:pointer;">Apply</button>
+        </div>
+      </label>
+      <div id="promoMsg" style="margin-top:6px;font-size:13px;color:#555;"></div>
+    </div>
+
+    <div class="total-box">
+      Total: $<span id="total">0.00</span>
+      <span id="discountLine" class="total-small hidden">Sibling discount savings: $<span id="discountSaved">0.00</span></span>
+    </div>
+
+    <button id="checkoutButton" style="background: #635bff; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; margin-top: 16px; cursor: pointer; display: none;">
+      Proceed to Checkout
+    </button>
+  </div>
+
+  <script src="https://js.stripe.com/v3/"></script>
+  <script>
+    // ---------------------------------
+    // Pricing + config
+    // ---------------------------------
+    const BASE_PRICE = 84.00;             // Camper 1 price
+    const SIBLING_DISCOUNT_RATE = 0.10;   // 10% off for campers 2+
+
+    // --- Admin knobs (you adjust these) ---
+    const CAPACITY = 40;                  // total seats for this camp
+    let   REGISTERED = 8;                 // how many are actually registered (you change this per camp)
+    const FULLNESS_ALPHA = 0.15;          // curve “speed” (higher = rises faster)
+
+    // Promo codes map (code -> percent off whole order)
+    const PROMO_CODES = { SAVE10: 10, SAVE15: 15, MEMBER20: 20, TEST99: 99 };
+    let ACTIVE_PROMO_PCT = 0;
+
+    // State
+    let CAMPER_STATE = {}; // persist user-typed values between re-renders
+
+    // Stripe configuration - replace with your key
+    const STRIPE_PUBLISHABLE_KEY = 'pk_live_51HHwvJHkXHsAaBd2i1rZtByJB18GIbUxWx3iQz4JrsV1jejOaZxPGVI30fWij6mJCZgkoRwZtMpndHRvL9vvBbgh0007i0FTs2';
+    let stripe;
+
+    // Your deployed Netlify function
+    const FUNCTION_URL = '/.netlify/functions/create-checkout-session';
+
+    document.addEventListener('DOMContentLoaded', () => {
+loadRates();
+async function loadCapacity() {
+  try {
+    const r = await fetch('/.netlify/functions/capacity', { cache: 'no-store' });
+    const d = await r.json();
+
+    // Use live numbers from Google Sheets: count PAID + PENDING
+REGISTERED = Number((d.paid || 0) + (d.pending || 0));
+if (d.capacity) CAPACITY = Number(d.capacity);
+
+
+    // Draw the bar + text using your existing curve
+    updateFullness();
+  } catch (e) {
+    console.error('capacity fetch failed', e);
+    const t = document.getElementById('fullnessText');
+    if (t) t.textContent = 'Capacity unavailable';
+  }
+}
+
+
+  // ✅ Run immediately
+  loadCapacity();
+
+  const numSel = document.getElementById('numCampers');
+  numSel.addEventListener('change', () => {
+    CAMPER_STATE = captureState();
+    renderCamperForms();
+    applyState(CAMPER_STATE);
+    updateTotal();
+  });
+
+  renderCamperForms();
+  applyState(CAMPER_STATE);
+  updateTotal();
+
+  // Initialize Stripe
+  if (STRIPE_PUBLISHABLE_KEY) {
+    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+  }
+
+  // Promo listeners + fullness draw
+  document.getElementById('applyPromoBtn').addEventListener('click', applyPromo);
+  document.getElementById('promoCode').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') applyPromo();
+  });
+  updateFullness();
+
+  // Checkout button
+  document.getElementById('checkoutButton').addEventListener('click', redirectToCheckout);
+});
+
+
+    // --------------------------
+    // Promo + fullness helpers
+    // --------------------------
+    function applyPromo() {
+      const code = (document.getElementById('promoCode').value || '').trim().toUpperCase();
+      const pct = PROMO_CODES[code] || 0;
+      ACTIVE_PROMO_PCT = pct;
+      const msg = document.getElementById('promoMsg');
+      if (pct > 0) {
+        msg.textContent = `${pct}% off applied.`;
+      } else if (code) {
+        msg.textContent = 'Promo not recognized.';
+      } else {
+        msg.textContent = '';
+      }
+      updateTotal();
+    }
+    function promoMult() {
+      return (100 - (ACTIVE_PROMO_PCT || 0)) / 100;
+    }
+    // Logarithmic fullness curve; starts at 10%, slows near 100%
+    function updateFullness() {
+  const r = Math.max(0, Math.min(REGISTERED, CAPACITY)); // clamp
+  const f = CAPACITY > 0 ? r / CAPACITY : 0;             // fraction 0..1
+
+  // Tune this: bigger = rises faster early, smaller = flatter early.
+  const FULLNESS_SHAPE = 3; // try 2..4 to taste
+
+  const base = 1 - Math.exp(-FULLNESS_SHAPE * f);
+  const max  = 1 - Math.exp(-FULLNESS_SHAPE * 1);        // normalize to 0..1
+  const curve = max > 0 ? base / max : 0;
+
+  const pct  = Math.round(10 + 90 * curve);              // 10%..~100%
+  const left = Math.max(0, CAPACITY - r);
+
+  document.getElementById('fullnessText').textContent = `${pct}% full`;
+  document.getElementById('fullnessBar').style.width = `${pct}%`;
+  document.getElementById('spotsText').textContent = `${left} spots left`;
+}
+
+    // --------------------------
+    // Checkout
+    // --------------------------
+    async function redirectToCheckout() {
+      if (!stripe) {
+        alert('Stripe not loaded. Please check your publishable key.');
+        return;
+      }
+
+      const total = parseFloat(document.getElementById('total').textContent || '0');
+      if (total <= 0) {
+        alert('Please add at least one camper to proceed with payment.');
+        return;
+      }
+
+      const parentFirstName = document.getElementById('parentFirstName').value.trim();
+      const parentLastName  = document.getElementById('parentLastName').value.trim();
+      if (!parentFirstName || !parentLastName) {
+        alert('Please fill in the parent name fields before proceeding to checkout.');
+        return;
+      }
+
+      const lineItems = buildLineItems();
+      const reg       = gatherRegistrationData();
+
+      const firstCamper = reg.campers[0] || {};
+      const siblings    = Math.max(0, reg.campers.length - 1);
+      const discountSaved = Number((document.getElementById('discountSaved')?.textContent || '0').replace(/[^0-9.]/g,''));
+      const subtotal = (reg.total || 0) + discountSaved;
+
+      const optionsSummary = reg.campers.map((c, i) => {
+        const opts = [];
+        if (c.beforeCare) opts.push('Before care');
+        if (c.afterCare)  opts.push('After care');
+        if (c.hotLunch)   opts.push('Lunch');
+        return opts.length ? `Camper ${i+1}: ${opts.join(', ')}` : '';
+      }).filter(Boolean);
+// collect selected days labels per camper for logging
+      const selectedDaysAll = [];
+      for (let i = 1; i <= parseInt(document.getElementById('numCampers').value, 10) || 0; i++) {
+        const indices = selectedDaysForCamper(i);
+        const labels = indices.map(idx => dayLabels()[idx]);
+        selectedDaysAll.push({ camper: i, days: labels });
+      }
+    const payload = {
+  // send flat fields the function expects
+  parentFirstName,
+  parentLastName,
+  parentEmail: '',
+  parentPhone: '',
+
+  camperFirstName: firstCamper.firstName || '',
+  camperLastName:  firstCamper.lastName  || '',
+
+  campName: 'Camp Registration',
+  campDate: '',
+
+  selections: optionsSummary,            // array is fine; backend can join
+  subtotal,
+  siblingDiscount: discountSaved,
+  total: reg.total || total,
+
+  // Stripe + redirects
+  line_items: lineItems,
+  success_url: window.location.origin + '/camp/success/',
+  cancel_url:  window.location.origin + '/camp/cancelled/'
+};
+
+      try {
+        const res = await fetch(FUNCTION_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(errText || 'Checkout session failed');
+        }
+
+        const { url } = await res.json();
+        window.location.href = url; // send to Stripe Checkout
+      } catch (err) {
+        console.error('Checkout error:', err);
+        alert('Checkout error: ' + (err.message || err));
+      }
+    }
+
+    // --------------------------
+    // Line items (sibling + promo applied)
+    // --------------------------
+    function buildLineItems() {
+      const items = [];
+      const num = parseInt(document.getElementById('numCampers').value, 10) || 0;
+
+      for (let i = 1; i <= num; i++) {
+        const firstName = document.querySelector(`[name="childFirst${i}"]`)?.value || 'Camper';
+        const lastName = document.querySelector(`[name="childLast${i}"]`)?.value || i;
+
+        const isFirst = (i === 1);
+
+        // Base camp fee
+        let basePrice = BASE_PRICE * (isFirst ? 1 : (1 - SIBLING_DISCOUNT_RATE));
+        basePrice = basePrice * promoMult();
+        const basePriceInCents = Math.round(basePrice * 100);
+
+        items.push({
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Camp - ${firstName} ${lastName}${!isFirst ? ' (Sibling Discount)' : ''}`,
+              description: `Camp registration for ${firstName} ${lastName}`
+            },
+            unit_amount: basePriceInCents
+          },
+          quantity: 1
+        });
+
+        // Before care
+        const beforeCare = document.querySelector(`input[data-kind="before"][data-i="${i}"]`);
+        if (beforeCare && beforeCare.checked) {
+          let amt = 18;
+          if (!isFirst) amt = amt * (1 - SIBLING_DISCOUNT_RATE);
+          amt = amt * promoMult();
+          items.push({
+            price_data: {
+              currency: 'usd',
+              product_data: { name: `Before Camp Care - ${firstName} ${lastName}` },
+              unit_amount: Math.round(amt * 100)
+            },
+            quantity: 1
+          });
+        }
+
+        // After care
+        const afterCare = document.querySelector(`input[data-kind="after"][data-i="${i}"]`);
+        if (afterCare && afterCare.checked) {
+          let amt = 25;
+          if (!isFirst) amt = amt * (1 - SIBLING_DISCOUNT_RATE);
+          amt = amt * promoMult();
+          items.push({
+            price_data: {
+              currency: 'usd',
+              product_data: { name: `After Camp Care - ${firstName} ${lastName}` },
+              unit_amount: Math.round(amt * 100)
+            },
+            quantity: 1
+          });
+        }
+
+        // Hot lunch
+        const lunch = document.querySelector(`input[name="lunch${i}"]:checked`);
+        if (lunch && lunch.value === '6') {
+          let amt = 6 * promoMult();
+          items.push({
+            price_data: {
+              currency: 'usd',
+              product_data: { name: `Hot Lunch - ${firstName} ${lastName}` },
+              unit_amount: Math.round(amt * 100)
+            },
+            quantity: 1
+          });
+        }
+      }
+
+      return items;
+    }
+
+    // --------------------------
+    // Gather data for logging
+    // --------------------------
+    function gatherRegistrationData() {
+      const data = {
+        parent: {
+          firstName: document.getElementById('parentFirstName').value,
+          lastName: document.getElementById('parentLastName').value,
+          billingAddress: document.getElementById('billingAddress').value
+        },
+        campers: [],
+        total: parseFloat(document.getElementById('total').textContent)
+      };
+
+      const num = parseInt(document.getElementById('numCampers').value, 10) || 0;
+      for (let i = 1; i <= num; i++) {
+        const camper = {
+          firstName: document.querySelector(`[name="childFirst${i}"]`)?.value || '',
+          lastName: document.querySelector(`[name="childLast${i}"]`)?.value || '',
+          birthdate: document.querySelector(`[name="birthdate${i}"]`)?.value || '',
+          age: document.querySelector(`[name="childAge${i}"]`)?.value || '',
+          careRequired: document.querySelector(`input[name="careReq${i}"]:checked`)?.value === 'yes',
+          beforeCare: document.querySelector(`input[data-kind="before"][data-i="${i}"]`)?.checked || false,
+          afterCare: document.querySelector(`input[data-kind="after"][data-i="${i}"]`)?.checked || false,
+          hotLunch: document.querySelector(`input[name="lunch${i}"]:checked`)?.value === '6',
+          hasAllergies: document.querySelector(`input[name="allergy${i}"]:checked`)?.value === 'yes',
+          allergyDetails: document.getElementById(`allergyDetails${i}`)?.value || ''
+        };
+        data.campers.push(camper);
+      }
+
+      return data;
+    }
+
+    // --------------------------
+    // Render + state utils
+    // --------------------------
+    function renderCamperForms() {
+      const num = parseInt(document.getElementById('numCampers').value, 10) || 0;
+      const container = document.getElementById('campersContainer');
+      container.innerHTML = '';
+
+      for (let i = 1; i <= num; i++) {
+        const el = document.createElement('div');
+        el.className = 'camper-form';
+        el.innerHTML = `
+          <h2>Camper ${i}</h2>
+
+          <div class="grid two-col">
+            <label>Child's First Name
+              <input type="text" name="childFirst${i}" />
+            </label>
+            <label>Child's Last Name
+              <input type="text" name="childLast${i}" />
+            </label>
+          </div>
+
+          <div class="grid two-col">
+            <label>Child's Birthdate
+              <input type="date" name="birthdate${i}" max="${todayISO()}" />
+            </label>
+            <label>Child's Age (auto-calculated)
+              <input type="text" name="childAge${i}" readonly />
+            </label>
+          </div>
+            <hr />
+          <div class="group">
+            <strong>Select Days</strong>
+            <div id="days${i}" class="options"></div>
+          </div>
+          <hr />
+          <div class="group">
+            <strong>Do you require Before or After Camp Care?</strong>
+            <div class="options">
+              <label class="opt"><input type="radio" name="careReq${i}" value="yes" /> Yes</label>
+              <label class="opt"><input type="radio" name="careReq${i}" value="no" checked /> No</label>
+            </div>
+            <div id="careOptions${i}" class="group hidden">
+              <div class="options">
+                <label class="opt"><input type="checkbox" data-kind="before" data-i="${i}" value="18" /> Before Camp Care ($18)</label>
+                <label class="opt"><input type="checkbox" data-kind="after" data-i="${i}" value="25" /> After Camp Care ($25)</label>
+              </div>
+            </div>
+          </div>
+
+          <hr />
+          <div class="group">
+            <strong>Hot Lunch</strong>
+            <div class="options">
+              <label class="opt"><input type="radio" name="lunch${i}" value="6" /> Yes ($6)</label>
+              <label class="opt"><input type="radio" name="lunch${i}" value="0" checked /> No</label>
+            </div>
+          </div>
+
+          <hr />
+          <div class="group">
+  <strong>Allergies and Behavioral Considerations</strong>
+  <div class="options">
+    <label class="opt"><input type="radio" name="allergy${i}" value="yes" /> Yes</label>
+    <label class="opt"><input type="radio" name="allergy${i}" value="no" checked /> No</label>
+  </div>
+  <textarea
+    id="allergyDetails${i}"
+    class="hidden"
+    placeholder="Please describe any allergies, medical care needs, or behavioral strategies that will help us best support your child at camp."></textarea>
+</div>
+
+        `;
+        container.appendChild(el);
+      // build day checkboxes from Rates.DAY_LABELS
+const daysWrap = el.querySelector('#days'+i);
+dayLabels().forEach((label, idx)=>{
+  const id = `day_${i}_${idx}`;
+  const span = document.createElement('span');
+  span.className = 'opt';
+  span.innerHTML = `<label class="opt"><input type="checkbox" data-day data-i="${i}" data-dayidx="${idx}" id="${id}"> ${label}</label>`;
+  daysWrap.appendChild(span);
+});
+      }
+
+      container.onchange = (e) => {
+        const t = e.target;
+        if (!(t instanceof HTMLInputElement)) return;
+
+        // Toggle care options based on Yes/No
+        if (t.name && t.name.startsWith('careReq')) {
+          const i = t.name.replace('careReq', '');
+          const panel = document.getElementById('careOptions' + i);
+          if (t.value === 'yes') {
+            panel.classList.remove('hidden');
+          } else {
+            panel.classList.add('hidden');
+            // clear any previously checked care boxes
+            ['before','after'].forEach(kind => {
+              const box = document.querySelector(`input[data-kind="${kind}"][data-i="${i}"]`);
+              if (box) box.checked = false;
+            });
+          }
+        }
+
+        // Allergy details toggle
+        if (t.name && t.name.startsWith('allergy')) {
+          const i = t.name.replace('allergy', '');
+          const details = document.getElementById('allergyDetails' + i);
+          if (t.value === 'yes') details.classList.remove('hidden');
+          else details.classList.add('hidden');
+        }
+
+        // Birthdate -> Age calculation
+        if (t.name && t.name.startsWith('birthdate')) {
+          const i = t.name.replace('birthdate', '');
+          const ageField = document.querySelector(`input[name="childAge${i}"]`);
+          if (ageField) {
+            ageField.value = calcAge(t.value);
+          }
+        }
+
+        updateTotal();
+      };
+
+      // initialize ages if pre-filled
+      for (let i = 1; i <= num; i++) {
+        const bd = document.querySelector(`input[name="birthdate${i}"]`);
+        const ageField = document.querySelector(`input[name="childAge${i}"]`);
+        if (bd && bd.value && ageField) {
+          ageField.value = calcAge(bd.value);
+        }
+      }
+
+      updateTotal();
+    }
+
+    function captureState() {
+      const data = {};
+      const campers = document.querySelectorAll('.camper-form');
+      campers.forEach((_, idx) => {
+        const i = idx + 1;
+        data[i] = {};
+        ['childFirst','childLast','birthdate','childAge'].forEach(f => {
+          const el = document.querySelector(`[name='${f}${i}']`);
+          if (el) data[i][f] = el.value;
+        });
+        const careReq = document.querySelector(`input[name='careReq${i}']:checked`);
+        data[i].careReq = careReq ? careReq.value : 'no';
+        ['before','after'].forEach(kind => {
+          const el = document.querySelector(`input[data-kind='${kind}'][data-i='${i}']`);
+          data[i][kind] = el ? !!el.checked : false;
+        });
+        const lunch = document.querySelector(`input[name='lunch${i}']:checked`);
+        data[i].lunch = lunch ? lunch.value : '0';
+        const allergy = document.querySelector(`input[name='allergy${i}']:checked`);
+        data[i].allergy = allergy ? allergy.value : 'no';
+        const allergyDetails = document.getElementById('allergyDetails' + i);
+        data[i].allergyDetails = allergyDetails ? allergyDetails.value : '';
+      });
+      return data;
+    }
+
+    function applyState(prev) {
+      if (!prev) return;
+      const num = parseInt(document.getElementById('numCampers').value, 10) || 0;
+      for (let i = 1; i <= num; i++) {
+        const p = prev[i];
+        if (!p) continue;
+        setVal(`childFirst${i}`, p.childFirst || '');
+        setVal(`childLast${i}`, p.childLast || '');
+        setVal(`birthdate${i}`, p.birthdate || '');
+        const ageField = document.querySelector(`input[name='childAge${i}']`);
+        if (ageField) ageField.value = p.childAge || (p.birthdate ? calcAge(p.birthdate) : '');
+
+        checkRadio(`careReq${i}`, p.careReq || 'no');
+        const panel = document.getElementById('careOptions' + i);
+        if (panel) {
+          if (p.careReq === 'yes') panel.classList.remove('hidden'); else panel.classList.add('hidden');
+        }
+        setCheckbox(`before`, i, !!p.before);
+        setCheckbox(`after`, i, !!p.after);
+        checkRadio(`lunch${i}`, p.lunch || '0');
+        checkRadio(`allergy${i}`, p.allergy || 'no');
+        const details = document.getElementById('allergyDetails' + i);
+        if (details) {
+          details.value = p.allergyDetails || '';
+          if (p.allergy === 'yes') details.classList.remove('hidden'); else details.classList.add('hidden');
+        }
+      }
+    }
+
+    function setVal(name, val) {
+      const el = document.querySelector(`[name='${name}']`);
+      if (el) el.value = val;
+    }
+    function checkRadio(name, value) {
+      const el = document.querySelector(`input[name='${name}'][value='${value}']`);
+      if (el) el.checked = true;
+    }
+    function setCheckbox(kind, i, checked) {
+      const el = document.querySelector(`input[data-kind='${kind}'][data-i='${i}']`);
+      if (el) el.checked = !!checked;
+    }
+
+    function todayISO() {
+      const d = new Date();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${d.getFullYear()}-${m}-${day}`;
+    }
+
+    function calcAge(isoDate) {
+      if (!isoDate) return '';
+      const today = new Date();
+      const bd = new Date(isoDate);
+      let age = today.getFullYear() - bd.getFullYear();
+      const m = today.getMonth() - bd.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
+      return isNaN(age) ? '' : String(age);
+    }
+
+    // Totals (sibling discount on care too, and promo across everything)
+function updateTotal() {
+  let total = 0, discountSaved = 0;
+  const num = parseInt(document.getElementById('numCampers').value, 10) || 0;
+
+  for (let i = 1; i <= num; i++) {
+    const isFirst = (i === 1);
+    const nDays = selectedDaysForCamper(i).length;
+
+    let base = priceForDays(nDays);
+    const sibDisc = isFirst ? 0 : base * SIBLING_DISCOUNT_RATE;
+    discountSaved += sibDisc;
+    base -= sibDisc;
+
+    const before = document.querySelector(`input[data-kind="before"][data-i="${i}"]`)?.checked ? Number(RATES.BEFORE_CARE||0) * nDays : 0;
+    const after  = document.querySelector(`input[data-kind="after"][data-i="${i}"]`)?.checked  ? Number(RATES.AFTER_CARE||0)  * nDays : 0;
+    const lunch  = (document.querySelector(`input[name="lunch${i}"]:checked`)?.value === '6') ? Number(RATES.HOT_LUNCH||0)  * nDays : 0;
+
+    const camperTotal = (base + before + after + lunch) * promoMult();
+    total += camperTotal;
+  } // ← end for
+
+  document.getElementById('total').textContent = total.toFixed(2);
+  const line = document.getElementById('discountLine');
+  const savedEl = document.getElementById('discountSaved');
+  if (discountSaved > 0) { savedEl.textContent = discountSaved.toFixed(2); line.classList.remove('hidden'); }
+  else { savedEl.textContent = '0.00'; line.classList.add('hidden'); }
+
+  document.getElementById('checkoutButton').style.display = total > 0 ? 'inline-block' : 'none';
+} // ← end function
+
+let RATES = {};
+const CAMP_SHEET = 'Thanksgiving2025';
+
+async function loadRates() {
+  const r = await fetch('/.netlify/functions/get-rates', { cache:'no-store' });
+  RATES = await r.json(); // { "1 Day":84, "2 Days":164, BEFORE_CARE:18, ..., DAY_LABELS:"Nov. 24, Nov. 25, ..." }
+  renderCamperForms();  // re-render once we have labels
+  updateTotal();
+}
+
+function dayLabels(){ return String(RATES.DAY_LABELS||'').split(',').map(s=>s.trim()).filter(Boolean); }
+function priceForDays(n){
+  const tier = RATES[`${n} Day${n>1?'s':''}`];
+  const one  = Number(RATES['1 Day']||0);
+  return Number(tier!=null ? tier : n*one);
+}
+function selectedDaysForCamper(i){
+  return Array.from(document.querySelectorAll(`input[data-day][data-i="${i}"]:checked`))
+    .map(cb => Number(cb.getAttribute('data-dayidx')));
+} 
+  </script>
+</body>
+</html>
