@@ -3,7 +3,7 @@ const fetch = require('node-fetch');
 
 exports.handler = async () => {
   try {
-    const url = process.env.APPS_SCRIPTS_URL + '?mode=rates';
+    const url = process.env.APPS_SCRIPTS_URL + '?mode=rates'; // uses your Apps Script URL
     const r = await fetch(url, { method: 'GET' });
     const text = await r.text();
     return {
@@ -19,3 +19,4 @@ exports.handler = async () => {
     return { statusCode: 500, body: JSON.stringify({ error: String(err) }) };
   }
 };
+
