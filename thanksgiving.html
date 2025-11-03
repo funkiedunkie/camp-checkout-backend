@@ -24,6 +24,34 @@
     .total-box { margin-top:20px; font-size:18px; font-weight:700; padding:12px 14px; border:1px solid var(--border); border-radius:10px; display:inline-block;}
     .total-small { font-size:14px; font-weight:500; color:#444; display:block; margin-top:6px;}
     .hidden { display:none;}
+/* --- Field consistency patch --- */
+.grid.two-col {
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 20px;
+}
+@media (max-width: 640px) {
+  .grid.two-col { grid-template-columns: 1fr; }
+}
+
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="date"],
+select, textarea {
+  box-sizing: border-box;
+  width: 100%;
+  height: 40px;  /* consistent height for all fields */
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
   </style>
 </head>
 <body>
