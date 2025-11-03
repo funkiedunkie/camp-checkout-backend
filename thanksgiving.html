@@ -57,7 +57,12 @@ label {
 <body>
   <div class="container">
     <div style="text-align:center; margin-bottom:20px;">
-      <img src="/camp/logo.png" alt="Bodies in Motion Logo" style="max-width:250px;height:auto;display:block;margin:0 auto;">
+      <img
+  src="https://bimcampcheckout.netlify.app/camp/logo.png"
+  alt="Bodies in Motion Logo"
+  style="max-width:250px;height:auto;display:block;margin:0 auto;"
+>
+
     </div>
 
     <h1 style="text-align:center;">Camp Registration</h1>
@@ -132,7 +137,9 @@ let REGISTERED = 8;
 // Stripe
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51HHwvJHkXHsAaBd2i1rZtByJB18GIbUxWx3iQz4JrsV1jejOaZxPGVI30fWij6mJCZgkoRwZtMpndHRvL9vvBbgh0007i0FTs2';
     let stripe;
-const FUNCTION_URL = "/.netlify/functions/create-checkout-session"; // optional
+const NETLIFY_ORIGIN = "https://bimcampcheckout.netlify.app";
+const CAPACITY_URL   = `${NETLIFY_ORIGIN}/.netlify/functions/capacity`;
+const FUNCTION_URL   = `${NETLIFY_ORIGIN}/.netlify/functions/create-checkout-session`;
 
 /* ===== STATE ===== */
 let CAMPER_STATE = {};
@@ -166,7 +173,7 @@ function priceForDays(n){
 
 /* ===== CAPACITY (SAFE) ===== */
 function safeLoadCapacity(){
-  fetch("/.netlify/functions/capacity", {cache:"no-store"})
+  fetch(CAPACITY_URL, { cache:"no-store" })
     .then(r=>{
       if(!r.ok) throw new Error("capacity HTTP "+r.status);
       const ct=r.headers.get("content-type")||"";
