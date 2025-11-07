@@ -128,7 +128,7 @@ const PROMO_CODES = { SAVE10:10, SAVE15:15, MEMBER20:20, TEST99:99 };
 let ACTIVE_PROMO_PCT = 0;
 
 // Permanent Apps Script endpoint
-const EXEC_URL = "https://script.google.com/macros/s/AKfycby7CJsPA96j7pzRLtqp_V1NVuBfurHwdhYlKoYXyiqpzMnHPqR12HyXhPPK3k0vWr3G/exec";
+const EXEC_URL = "https://script.google.com/macros/s/AKfycbyEWnlhQfWxRB-dRGMHdEW06jLVvEJid4uh9iPWMQLu0hMdGmg3_QHz5kTBJN2GRa_A/exec";
 
 // Capacity display (safe defaults; will try to update)
 let CAPACITY = 40;
@@ -140,6 +140,7 @@ const STRIPE_PUBLISHABLE_KEY = 'pk_live_51HHwvJHkXHsAaBd2i1rZtByJB18GIbUxWx3iQz4
 const NETLIFY_ORIGIN = "https://bimcampcheckout.netlify.app";
 const CAPACITY_URL   = `${NETLIFY_ORIGIN}/.netlify/functions/capacity`;
 const FUNCTION_URL   = `${NETLIFY_ORIGIN}/.netlify/functions/create-checkout-session`;
+const GET_RATES_URL  = `${NETLIFY_ORIGIN}/.netlify/functions/get-rates`;
 
 /* ===== STATE ===== */
 let CAMPER_STATE = {};
@@ -154,7 +155,7 @@ function promoMult(){ return (100 - (ACTIVE_PROMO_PCT||0))/100; }
 
 /* ===== RATES ===== */
 async function loadRates(){
-  const r = await fetch(`${EXEC_URL}?mode=rates`, {cache:"no-store"});
+  const r = await fetch(GET_RATES_URL, { cache: 'no-store' });
   if(!r.ok) throw new Error("rates HTTP "+r.status);
   RATES = await r.json();
   renderCamperForms();   // build day lists once we have labels
