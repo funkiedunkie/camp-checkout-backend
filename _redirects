@@ -1,2 +1,3 @@
-/winter /winter/ 301
-/winter.html /winter/ 301
+#winter goes straight to the actual file
+/winter    /winter.html 301
+/winter/   /winter.html 301
