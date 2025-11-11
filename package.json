@@ -1,6 +1,9 @@
 {
   "name": "camp-checkout-backend",
   "version": "1.0.0",
+  "scripts": {
+    "backfill:paid-status": "node scripts/backfill-paid-status.js"
+  },
   "dependencies": {
     "googleapis": "^161.0.0",
     "node-fetch": "^2.7.0",
