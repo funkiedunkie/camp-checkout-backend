@@ -602,6 +602,9 @@
         line_items: lineItems,
         success_url: successUrl,
         cancel_url: cancelUrl
+        tab: 'Winter',
+        camp: 'winter',
+        registrationId
       };
 
       try {
