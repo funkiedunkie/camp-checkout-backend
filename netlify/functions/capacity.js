@@ -1,15 +1,33 @@
-import { getSheet } from './_sheets.js';
+// netlify/functions/capacity.js
+const { getSheet } = require('./_sheets.js');
 
-export async function handler() {
+exports.handler = async () => {
   try {
     const rows = await getSheet();
 
-    // Count both paid + pending
+    const normalizeKey = value => (value || '').toString().replace(/[^a-z0-9]/gi, '').toLowerCase();
+    const matchesColumn = (key, targets) => {
+      const normalizedKey = normalizeKey(key);
+      const list = Array.isArray(targets) ? targets : [targets];
+      return list.some(target => {
+        const normalizedTarget = normalizeKey(target);
+        return normalizedKey === normalizedTarget || normalizedKey.endsWith(normalizedTarget);
+      });
+    };
+
+    const statusValue = row => {
+      for (const [key, value] of Object.entries(row || {})) {
+        if (matchesColumn(key, ['Status', 'PaymentStatus'])) {
+          return (value || '').toString().trim().toUpperCase();
+        }
+      }
+      return '';
+    };
+
     const paid = rows.filter(r =>
-      ['PAID', 'PENDING'].includes((r.status || '').toUpperCase())
+      ['PAID', 'PENDING'].includes(statusValue(r))
     ).length;
 
-    // Pull capacity from Netlify env or fallback
     const capacity = Number(process.env.CAPACITY) || 40;
 
     return {
@@ -20,4 +38,4 @@ export async function handler() {
     console.error(err);
     return { statusCode: 500, body: err.toString() };
   }
-}
+};
