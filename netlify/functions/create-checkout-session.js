@@ -27,19 +27,29 @@ exports.handler = async (event) => {
     const discounts   = form.discounts ?? form.siblingDiscount ?? '';
     const total       = form.total ?? '';
 
+    // ---- NEW: extract Winter-specific fields ----
+    const tab  = form.tab || 'Registrations';       // <- this will be "Winter" from the form
+    const camp = form.camp || 'winter';
+    const registrationId = form.registrationId || (Date.now() + '-' + Math.random().toString(36).slice(2));
+
     // Stripe inputs (kept as-is from body)
     const line_items  = form.line_items || body.line_items || [];
     const success_url = form.success_url || body.success_url || 'https://bimcampcheckout.netlify.app/camp/success/';
     const cancel_url  = form.cancel_url  || body.cancel_url  || 'https://bimcampcheckout.netlify.app/camp/cancelled/';
 
-    // ---- Create Stripe Checkout session
+    // ---- Create Stripe Checkout session ----
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
       line_items,
       success_url,
       cancel_url,
+      // NEW ↓↓↓
+      client_reference_id: registrationId,
       metadata: {
+        registrationId,
+        tab,
+        camp,
         camper: `${camperFirst} ${camperLast}`.trim(),
         parentName,
         parentEmail,
@@ -47,7 +57,7 @@ exports.handler = async (event) => {
       }
     });
 
-    // ---- Send to Google Apps Script (Sheets logger)
+    // ---- Send to Google Apps Script (Sheets logger) ----
     // NOTE: This is fire-and-forget; we log status to diagnose if it breaks.
     let scriptStatus = 'n/a';
     try {
@@ -68,7 +78,11 @@ exports.handler = async (event) => {
           siblings,
           subtotal,
           discounts,
-          total
+          total,
+          // NEW ↓↓↓
+          tab,
+          camp,
+          registrationId
         })
       });
       scriptStatus = `${resp.status}`;
