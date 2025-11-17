@@ -397,84 +397,107 @@ function applyPromo(){
 
 /* ===== CHECKOUT (unchanged logic except totals alignment) ===== */
 async function redirectToCheckout(){
-  if(!STRIPE_PUBLISHABLE_KEY){ alert("Stripe not loaded. Add your publishable key."); return; }
-  if(!stripe) stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+  if (!STRIPE_PUBLISHABLE_KEY) {
+    alert("Stripe not loaded. Add your publishable key.");
+    return;
+  }
+  if (!stripe) stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
 
-  const total = parseFloat($("#total").textContent||"0");
-  if(total<=0){ alert("Please add at least one camper."); return; }
+  const total = parseFloat($("#total").textContent || "0");
+  if (total <= 0) {
+    alert("Please add at least one camper.");
+    return;
+  }
 
- const parentFirstName = $("#parentFirstName").value.trim();
-const parentLastName  = $("#parentLastName").value.trim();
-const parentEmail     = $("#parentEmail").value.trim();
-const parentPhone     = $("#parentPhone").value.trim();
+  const parentFirstName = $("#parentFirstName").value.trim();
+  const parentLastName  = $("#parentLastName").value.trim();
+  const parentEmail     = $("#parentEmail").value.trim();
+  const parentPhone     = $("#parentPhone").value.trim();
+  const billingAddress  = $("#billingAddress").value.trim();
 
-if(!parentFirstName || !parentLastName){
-  alert("Please fill in the parent first and last name."); return;
-}
-if(!parentEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail)){
-  alert("Please enter a valid email address."); return;
-}
-if(!parentPhone || parentPhone.replace(/[^\d]/g,"").length < 7){
-  alert("Please enter a valid phone number."); return;
-}
-
+  if (!parentFirstName || !parentLastName) {
+    alert("Please fill in the parent first and last name.");
+    return;
+  }
+  if (!parentEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail)) {
+    alert("Please enter a valid email address.");
+    return;
+  }
+  if (!parentPhone || parentPhone.replace(/[^\d]/g,"").length < 7) {
+    alert("Please enter a valid phone number.");
+    return;
+  }
 
   const lineItems = buildLineItems();
-  const reg = gatherRegistrationData();
-// 1) Build the "options" array your sheet expects
-const selectionLines = reg.campers.map((c,i) => {
-  const o = [];
-  if (c.beforeCare) o.push("Before");
-  if (c.afterCare)  o.push("After");
-  if (c.hotLunch)   o.push("Lunch");
-  return o.length ? `Camper ${i+1}: ${o.join(", ")}` : "";
-}).filter(Boolean);
+  const reg       = gatherRegistrationData();
 
-// 2) Collect selected day labels per camper (your doPost flattens this)
-const selectedDaysAll = [];
-const nCampers = parseInt($("#numCampers").value,10) || 0;
-for (let i = 1; i <= nCampers; i++) {
-  const idxs   = selectedDaysForCamper(i);
-  const labels = idxs.map(idx => dayLabels()[idx]);
-  selectedDaysAll.push({ camper: i, days: labels });
-}
+  // 1) Build the "options" array your sheet expects
+  const selectionLines = reg.campers.map((c, i) => {
+    const o = [];
+    if (c.beforeCare) o.push("Before");
+    if (c.afterCare)  o.push("After");
+    if (c.hotLunch)   o.push("Lunch");
+    return o.length ? `Camper ${i+1}: ${o.join(", ")}` : "";
+  }).filter(Boolean);
 
-// 3) Send EXACT keys your Apps Script expects
-const payload = {
-  // parent
-  parentName: `${parentFirstName} ${parentLastName}`.trim(),
-  parentEmail,
-  phone: parentPhone,
+  // 2) Collect selected day labels per camper
+  const selectedDaysAll = [];
+  const nCampers = parseInt($("#numCampers").value, 10) || 0;
+  for (let i = 1; i <= nCampers; i++) {
+    const idxs   = selectedDaysForCamper(i);
+    const labels = idxs.map(idx => dayLabels()[idx]);
+    selectedDaysAll.push({ camper: i, days: labels });
+  }
 
-  // first camper only (your sheet uses these two columns)
-  camperFirst: reg.campers[0]?.firstName || "",
-  camperLast:  reg.campers[0]?.lastName  || "",
+  // 3) Payload sent to Netlify (and then Apps Script)
+  const payload = {
+    // parent
+    parentName: `${parentFirstName} ${parentLastName}`.trim(),
+    parentEmail,
+    phone: parentPhone,
 
-  // sheet/flow context
-  campSheet: CAMP_SHEET,
-  week: "",                 // leave blank unless you actually use this
-  selectedDays: selectedDaysAll,
-  options: selectionLines,  // array; Apps Script joins with ", "
+    // first camper only (sheet uses these two columns)
+    camperFirst: reg.campers[0]?.firstName || "",
+    camperLast:  reg.campers[0]?.lastName  || "",
 
-  // money
-  siblings: Math.max(0, nCampers - 1),
-  subtotal: reg.total,
-  discounts: 0,
-  total: reg.total,
+    // sheet/flow context
+    campSheet: CAMP_SHEET,      // <- "Winter"
+    week: "",                   // leave blank unless you use it
+    selectedDays: selectedDaysAll,
+    options: selectionLines,
 
-  // Stripe/session fields (Apps Script has safe defaults if left blank)
-  status: "PENDING",
-  sessionId: "",
-  checkoutUrl: "",
+    // money
+    siblings: Math.max(0, nCampers - 1),
+    subtotal: reg.total,
+    discounts: 0,
+    total: reg.total,
 
-  // keep your Stripe items for the Netlify function
-  line_items: lineItems,
-  success_url: window.location.origin + "/camp/success/",
-  cancel_url:  window.location.origin + "/camp/cancelled/"
-};
+    // Stripe/session fields
+    status: "PENDING",
+    sessionId: "",
+    checkoutUrl: "",
 
-  const res = await fetch(FUNCTION_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload) });
-  if(!res.ok) throw new Error(await res.text()||"Checkout session failed");
+    // NEW: extra info for your new columns
+    billingAddress,
+    registrationData: reg,      // includes birthdate, age, notes, etc.
+    camp: "winter",
+
+    // keep your Stripe items for the Netlify function
+    line_items: lineItems,
+    success_url: window.location.origin + "/camp/success/",
+    cancel_url:  window.location.origin + "/camp/cancelled/"
+  };
+
+  const res = await fetch(FUNCTION_URL, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    throw new Error(await res.text() || "Checkout session failed");
+  }
+
   const { url } = await res.json();
   window.location.href = url;
 }
