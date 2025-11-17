@@ -1,25 +1,29 @@
 (function() {
   const DEFAULT_CONFIG = {
-    basePrice: 84,
-    siblingDiscountRate: 0.1,
-    beforeCarePrice: 18,
-    afterCarePrice: 25,
-    lunchPrice: 6,
-    promoCodes: {},
-    capacityFunctionUrl: '/.netlify/functions/capacity',
-    fallbackCapacity: 40,
-    fallbackRegistered: 0,
-    stripePublishableKey: '',
-    checkoutFunctionUrl: '/.netlify/functions/create-checkout-session',
-    successPath: '/camp/success/',
-    cancelPath: '/camp/cancelled/',
-    campName: 'Camp Registration',
-    campDate: '',
-    baseProductName: 'Camp',
-    beforeCareLabel: 'Before Camp Care',
-    afterCareLabel: 'After Camp Care',
-    lunchLabel: 'Hot Lunch'
-  };
+  basePrice: 84,
+  siblingDiscountRate: 0.1,
+  beforeCarePrice: 18,
+  afterCarePrice: 25,
+  lunchPrice: 6,
+  promoCodes: {},
+  capacityFunctionUrl: '/.netlify/functions/capacity',
+  fallbackCapacity: 40,
+  fallbackRegistered: 0,
+  stripePublishableKey: '',
+  checkoutFunctionUrl: '/.netlify/functions/create-checkout-session',
+  successPath: '/camp/success/',
+  cancelPath: '/camp/cancelled/',
+  campName: 'Camp Registration',
+  campDate: '',
+  baseProductName: 'Camp',
+  beforeCareLabel: 'Before Camp Care',
+  afterCareLabel: 'After Camp Care',
+  lunchLabel: 'Hot Lunch',
+  // NEW: let each page choose its sheet + key
+  sheetName: 'Registrations', // default tab
+  campKey: 'generic'          // e.g. 'thanksgiving' or 'winter'
+};
+
 
   function mergeConfig(userConfig = {}) {
     const {
@@ -585,27 +589,38 @@
         })
         .filter(Boolean);
 
-      const payload = {
-        parentFirstName,
-        parentLastName,
-        parentEmail: '',
-        parentPhone: '',
-        camperFirstName: firstCamper.firstName || '',
-        camperLastName: firstCamper.lastName || '',
-        campName: config.campName,
-        campDate: config.campDate,
-        selections: optionsSummary,
-        subtotal,
-        siblingDiscount: discountSaved,
-        siblings,
-        total: reg.total || total,
-        line_items: lineItems,
-        success_url: successUrl,
-        cancel_url: cancelUrl
-        tab: 'Winter',
-        camp: 'winter',
-        registrationId
-      };
+     const registrationId =
+  (crypto && crypto.randomUUID) ? crypto.randomUUID() :
+  (Date.now() + '-' + Math.random().toString(36).slice(2));
+
+const payload = {
+  parentFirstName,
+  parentLastName,
+  parentEmail: '',
+  parentPhone: '',
+  camperFirstName: firstCamper.firstName || '',
+  camperLastName: firstCamper.lastName || '',
+  campName: config.campName,
+  campDate: config.campDate,
+  selections: optionsSummary,
+  subtotal,
+  siblingDiscount: discountSaved,
+  siblings,
+  total: reg.total || total,
+  line_items: lineItems,
+  success_url: successUrl,
+  cancel_url: cancelUrl,
+
+  // NEW: send additional data
+  billingAddress,
+  registrationData: reg,
+
+  // NEW: drive sheet + camp generically (NOT hard-coded Winter)
+  tab: config.sheetName || 'Registrations',
+  camp: config.campKey || config.campName || 'camp',
+  registrationId
+};
+
 
       try {
         const res = await fetch(config.checkoutFunctionUrl, {
