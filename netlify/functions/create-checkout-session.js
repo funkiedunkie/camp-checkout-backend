@@ -52,17 +52,18 @@ exports.handler = async (event) => {
       form.regId ||
       (Date.now() + '-' + Math.random().toString(36).slice(2));
 
-    // ---- Stripe inputs (kept as-is from body) ----
+    // ---- Stripe inputs (kept as-is from body, with new sane defaults) ----
     const line_items  = form.line_items || body.line_items || [];
+
     const success_url =
       form.success_url ||
       body.success_url ||
-      'https://bimcampcheckout.netlify.app/camp/success/';
+      'https://www.campsforkidsidaho.com/confirmation.html?session_id={CHECKOUT_SESSION_ID}';
 
     const cancel_url  =
       form.cancel_url ||
       body.cancel_url ||
-      'https://bimcampcheckout.netlify.app/camp/cancelled/';
+      'https://bimcampcheckout.netlify.app/thanksgiving.html';
 
     // ---- Create Stripe Checkout session ----
     const session = await stripe.checkout.sessions.create({
