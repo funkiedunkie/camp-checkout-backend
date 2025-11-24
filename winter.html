@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Camp Registration</title>
+  <title>Winter Camp Registration</title>
   <style>
     :root { --gap:14px; --pad:18px; --border:#dcdcdc; --brand:#1e90ff; }
     body { font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:24px; line-height:1.45; background:#f8fafc;}
     h1 { margin:0 0 10px; }
     .container { max-width:900px; margin:0 auto; background:#fff; border:4px solid var(--brand); border-radius:14px; padding:22px; box-shadow:0 6px 18px rgba(0,0,0,.06);}
-    select,input[type="text"],input[type="number"],input[type="date"],textarea{ width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:8px;}
+    select,input[type="text"],input[type="number"],input[type="date"],input[type="email"],input[type="tel"],textarea{ width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:8px;}
     textarea { min-height:84px; }
     label { display:flex; flex-direction:column; gap:6px; }
     .short { width:120px; display:inline-block; }
@@ -24,53 +24,55 @@
     .total-box { margin-top:20px; font-size:18px; font-weight:700; padding:12px 14px; border:1px solid var(--border); border-radius:10px; display:inline-block;}
     .total-small { font-size:14px; font-weight:500; color:#444; display:block; margin-top:6px;}
     .hidden { display:none;}
-/* --- Field consistency patch --- */
-.grid.two-col {
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
-  gap: 20px;
-}
-@media (max-width: 640px) {
-  .grid.two-col { grid-template-columns: 1fr; }
-}
+    /* --- Field consistency patch --- */
+    .grid.two-col {
+      grid-template-columns: repeat(2, minmax(220px, 1fr));
+      gap: 20px;
+    }
+    @media (max-width: 640px) {
+      .grid.two-col { grid-template-columns: 1fr; }
+    }
 
-input[type="text"],
-input[type="email"],
-input[type="tel"],
-input[type="date"],
-select, textarea {
-  box-sizing: border-box;
-  width: 100%;
-  height: 40px;  /* consistent height for all fields */
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font: inherit;
-}
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="date"],
+    select, textarea {
+      box-sizing: border-box;
+      width: 100%;
+      height: 40px;  /* consistent height for all fields */
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font: inherit;
+    }
 
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <div style="text-align:center; margin-bottom:20px;">
       <img
-  src="https://bimcampcheckout.netlify.app/camp/logo.png"
-  alt="Bodies in Motion Logo"
-  style="max-width:250px;height:auto;display:block;margin:0 auto;"
->
-
+        src="https://bimcampcheckout.netlify.app/camp/logo.png"
+        alt="Bodies in Motion Logo"
+        style="max-width:250px;height:auto;display:block;margin:0 auto;"
+      >
     </div>
 
-    <h1 style="text-align:center;">Camp Registration</h1>
+    <h1 style="text-align:center;">Winter Camp Registration</h1>
     <p style="text-align:center;">Choose the number of campers. The form(s) will appear below and the total will update automatically.</p>
 
     <label for="numCampers"><strong>How many campers are you registering?</strong></label>
     <select id="numCampers" class="short">
-      <option value="1" selected>1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+      <option value="1" selected>1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
     </select>
 
     <div id="campersContainer"></div>
@@ -80,15 +82,34 @@ label {
       <label>Parent First Name <input type="text" id="parentFirstName"></label>
       <label>Parent Last Name  <input type="text" id="parentLastName"></label>
     </div>
+
     <div class="grid two-col" style="margin-top:12px;">
-  <label>Parent Email
-    <input type="email" id="parentEmail" required>
-  </label>
-  <label>Parent Phone
-    <input type="tel" id="parentPhone" inputmode="tel" pattern="[\d\-\+\(\) ]{7,}" required>
-  </label>
-</div>
-    <label style="margin-top:12px; display:block;">Billing Address <input type="text" id="billingAddress"></label>
+      <label>Parent Email
+        <input type="email" id="parentEmail" required>
+      </label>
+      <label>Parent Phone
+        <input type="tel" id="parentPhone" inputmode="tel" pattern="[\d\-\+\(\) ]{7,}" required>
+      </label>
+    </div>
+
+    <label style="margin-top:12px; display:block;">
+      Billing Street Address
+      <input type="text" id="billingAddress">
+    </label>
+
+    <div class="grid two-col" style="margin-top:12px;">
+      <label>City
+        <input type="text" id="city">
+      </label>
+      <label>State
+        <input type="text" id="state">
+      </label>
+    </div>
+
+    <label style="margin-top:12px; display:block;">
+      Zip
+      <input type="text" id="zip">
+    </label>
 
     <!-- Camp fullness -->
     <div id="fullnessWrap" style="margin:14px 0;">
@@ -120,475 +141,504 @@ label {
     </button>
   </div>
 
- <script src="https://js.stripe.com/v3/"></script>
-<script>
-/* ===== CONFIG ===== */
-const SIBLING_DISCOUNT_RATE = 0.10;
-const PROMO_CODES = { SAVE10:10, SAVE15:15, MEMBER20:20, TEST99:99 };
-let ACTIVE_PROMO_PCT = 0;
+  <script src="https://js.stripe.com/v3/"></script>
+  <script>
+  /* ===== CONFIG ===== */
+  const SIBLING_DISCOUNT_RATE = 0.10;
+  const PROMO_CODES = { SAVE10:10, SAVE15:15, MEMBER20:20, TEST99:99 };
+  let ACTIVE_PROMO_PCT = 0;
 
-// Permanent Apps Script endpoint
-const EXEC_URL = "https://script.google.com/macros/s/AKfycbyEWnlhQfWxRB-dRGMHdEW06jLVvEJid4uh9iPWMQLu0hMdGmg3_QHz5kTBJN2GRa_A/exec";
+  // Apps Script endpoint (not currently used directly here, kept in case)
+  const EXEC_URL = "https://script.google.com/macros/s/AKfycbyEWnlhQfWxRB-dRGMHdEW06jLVvEJid4uh9iPWMQLu0hMdGmg3_QHz5kTBJN2GRa_A/exec";
 
-// Capacity display (safe defaults; will try to update)
-let CAPACITY = 40;
-let REGISTERED = 8;
+  // Capacity display (safe defaults; will try to update)
+  let CAPACITY = 40;
+  let REGISTERED = 8;
 
-// Stripe
-const STRIPE_PUBLISHABLE_KEY = 'pk_live_51HHwvJHkXHsAaBd2i1rZtByJB18GIbUxWx3iQz4JrsV1jejOaZxPGVI30fWij6mJCZgkoRwZtMpndHRvL9vvBbgh0007i0FTs2';
-    let stripe;
-const NETLIFY_ORIGIN = "https://bimcampcheckout.netlify.app";
-const CAPACITY_URL   = `${NETLIFY_ORIGIN}/.netlify/functions/capacity`;
-const FUNCTION_URL   = `${NETLIFY_ORIGIN}/.netlify/functions/create-checkout-session`;
-const GET_RATES_URL  = `${NETLIFY_ORIGIN}/.netlify/functions/get-rates`;
+  // Stripe
+  const STRIPE_PUBLISHABLE_KEY = 'pk_live_51HHwvJHkXHsAaBd2i1rZtByJB18GIbUxWx3iQz4JrsV1jejOaZxPGVI30fWij6mJCZgkoRwZtMpndHRvL9vvBbgh0007i0FTs2';
+  let stripe;
+  const NETLIFY_ORIGIN = "https://bimcampcheckout.netlify.app";
+  const CAPACITY_URL   = `${NETLIFY_ORIGIN}/.netlify/functions/capacity`;
+  const FUNCTION_URL   = `${NETLIFY_ORIGIN}/.netlify/functions/create-checkout-session`;
+  const GET_RATES_URL  = `${NETLIFY_ORIGIN}/.netlify/functions/get-rates`;
 
-/* ===== STATE ===== */
-let CAMPER_STATE = {};
-let RATES = {};                // loaded from EXEC_URL
-const CAMP_SHEET = "Winter";
+  /* ===== STATE ===== */
+  let CAMPER_STATE = {};
+  let RATES = {};                // loaded from GET_RATES_URL
+  const CAMP_SHEET = "Winter2025";  // <--- CHANGED from Thanksgiving2025
 
-/* ===== UTIL ===== */
-const $ = sel => document.querySelector(sel);
-function todayISO(){ const d=new Date(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${d.getFullYear()}-${m}-${day}`; }
-function calcAge(iso){ if(!iso) return ""; const t=new Date(), bd=new Date(iso); let a=t.getFullYear()-bd.getFullYear(); const m=t.getMonth()-bd.getMonth(); if(m<0||(m===0&&t.getDate()<bd.getDate())) a--; return isNaN(a)?"":String(a); }
-function promoMult(){ return (100 - (ACTIVE_PROMO_PCT||0))/100; }
-
-/* ===== RATES ===== */
-async function loadRates(){
-  const r = await fetch(GET_RATES_URL, { cache: 'no-store' });
-  if(!r.ok) throw new Error("rates HTTP "+r.status);
-  RATES = await r.json();
-  renderCamperForms();   // build day lists once we have labels
-  updateTotal();
-}
-function dayLabels(){
-  const dl = RATES.DAY_LABELS;
-  return Array.isArray(dl) ? dl : String(dl||"").split(",").map(s=>s.trim()).filter(Boolean);
-}
-function priceForDays(n){
-  const key = `${n} Day${n>1?"s":""}`;
-  const tier = RATES[key];
-  const one  = Number(RATES["1 Day"]||0);
-  return Number(tier!=null ? tier : n*one);
-}
-
-/* ===== CAPACITY (SAFE) ===== */
-let _capFetchInFlight = false;
-
-async function safeLoadCapacity(){
-  if (_capFetchInFlight) return;     // prevent double-calls
-  _capFetchInFlight = true;
-
-  const textEl = document.getElementById('fullnessText');
-  if (textEl) textEl.textContent = 'Checking capacity…';
-
-  try {
-    const r = await fetch(CAPACITY_URL, { cache: 'no-store' });
-    if (!r.ok) throw new Error('capacity HTTP ' + r.status);
-    const ct = (r.headers.get('content-type') || '').toLowerCase();
-    if (!ct.includes('application/json')) throw new Error('capacity not JSON');
-
-    const d = await r.json();
-    const paid    = Number(d.paid ?? 0);
-    const pending = Number(d.pending ?? 0);
-    const cap     = Number.isFinite(d.capacity) ? Number(d.capacity) : CAPACITY;
-
-    REGISTERED = Math.max(0, paid + pending);
-    CAPACITY   = Math.max(1, cap);   // avoid zero
-  } catch (e) {
-    console.warn('capacity fetch failed', e);
-    // no UI overwrite; we’ll render with whatever values we have
-  } finally {
-    updateFullness();                // always render something
-    _capFetchInFlight = false;
+  /* ===== UTIL ===== */
+  const $ = sel => document.querySelector(sel);
+  function todayISO(){
+    const d=new Date();
+    const m=String(d.getMonth()+1).padStart(2,'0');
+    const day=String(d.getDate()).padStart(2,'0');
+    return `${d.getFullYear()}-${m}-${day}`;
   }
-}
+  function calcAge(iso){
+    if(!iso) return "";
+    const t=new Date(), bd=new Date(iso);
+    let a=t.getFullYear()-bd.getFullYear();
+    const m=t.getMonth()-bd.getMonth();
+    if(m<0||(m===0&&t.getDate()<bd.getDate())) a--;
+    return isNaN(a)?"":String(a);
+  }
+  function promoMult(){ return (100 - (ACTIVE_PROMO_PCT||0))/100; }
 
-/* ===== FULLNESS BAR ===== */
-function updateFullness(){
-  const r=Math.max(0, Math.min(REGISTERED, CAPACITY));
-  const f=CAPACITY>0 ? r/CAPACITY : 0;
-  const SHAPE=3, base=1-Math.exp(-SHAPE*f), max=1-Math.exp(-SHAPE*1), curve=max>0?base/max:0;
-  const pct=Math.round(10+90*curve); const left=Math.max(0, CAPACITY-r);
-  $("#fullnessText").textContent = `${pct}% full`;
-  $("#fullnessBar").style.width = `${pct}%`;
-  $("#spotsText").textContent = `${left} spots left`;
-}
+  /* ===== RATES ===== */
+  async function loadRates(){
+    const r = await fetch(GET_RATES_URL, { cache: 'no-store' });
+    if(!r.ok) throw new Error("rates HTTP "+r.status);
+    RATES = await r.json();
+    renderCamperForms();   // build day lists once we have labels
+    updateTotal();
+  }
+  function dayLabels(){
+    const dl = RATES.DAY_LABELS;
+    return Array.isArray(dl) ? dl : String(dl||"").split(",").map(s=>s.trim()).filter(Boolean);
+  }
+  function priceForDays(n){
+    const key = `${n} Day${n>1?"s":""}`;
+    const tier = RATES[key];
+    const one  = Number(RATES["1 Day"]||0);
+    return Number(tier!=null ? tier : n*one);
+  }
 
-/* ===== RENDER CAMPERS ===== */
-function renderCamperForms(){
-  const num = parseInt($("#numCampers").value,10)||0;
-  const container = $("#campersContainer");
-  container.innerHTML = "";
+  /* ===== CAPACITY (SAFE) ===== */
+  let _capFetchInFlight = false;
 
-  for(let i=1;i<=num;i++){
-    const el = document.createElement("div");
-    el.className = "camper-form";
-    el.innerHTML = `
-      <h2>Camper ${i}</h2>
-      <div class="grid two-col">
-        <label>Child's First Name <input type="text" name="childFirst${i}" /></label>
-        <label>Child's Last Name  <input type="text" name="childLast${i}" /></label>
-      </div>
-      <div class="grid two-col">
-        <label>Child's Birthdate <input type="date" name="birthdate${i}" max="${todayISO()}" /></label>
-        <label>Child's Age (auto-calculated) <input type="text" name="childAge${i}" readonly /></label>
-      </div>
-      <hr />
-      <div class="group">
-        <strong>Select Days</strong>
-        <div id="days${i}" class="options"></div>
-      </div>
-      <hr />
-      <div class="group">
-        <strong>Do you require Before or After Camp Care?</strong>
-        <div class="options">
-          <label class="opt"><input type="radio" name="careReq${i}" value="yes" /> Yes</label>
-          <label class="opt"><input type="radio" name="careReq${i}" value="no" checked /> No</label>
+  async function safeLoadCapacity(){
+    if (_capFetchInFlight) return;     // prevent double-calls
+    _capFetchInFlight = true;
+
+    const textEl = document.getElementById('fullnessText');
+    if (textEl) textEl.textContent = 'Checking capacity…';
+
+    try {
+      const r = await fetch(CAPACITY_URL, { cache: 'no-store' });
+      if (!r.ok) throw new Error('capacity HTTP ' + r.status);
+      const ct = (r.headers.get('content-type') || '').toLowerCase();
+      if (!ct.includes('application/json')) throw new Error('capacity not JSON');
+
+      const d = await r.json();
+      const paid    = Number(d.paid ?? 0);
+      const pending = Number(d.pending ?? 0);
+      const cap     = Number.isFinite(d.capacity) ? Number(d.capacity) : CAPACITY;
+
+      REGISTERED = Math.max(0, paid + pending);
+      CAPACITY   = Math.max(1, cap);   // avoid zero
+    } catch (e) {
+      console.warn('capacity fetch failed', e);
+      // no UI overwrite; we’ll render with whatever values we have
+    } finally {
+      updateFullness();                // always render something
+      _capFetchInFlight = false;
+    }
+  }
+
+  /* ===== FULLNESS BAR ===== */
+  function updateFullness(){
+    const r=Math.max(0, Math.min(REGISTERED, CAPACITY));
+    const f=CAPACITY>0 ? r/CAPACITY : 0;
+    const SHAPE=3, base=1-Math.exp(-SHAPE*f), max=1-Math.exp(-SHAPE*1), curve=max>0?base/max:0;
+    const pct=Math.round(10+90*curve);
+    const left=Math.max(0, CAPACITY-r);
+    $("#fullnessText").textContent = `${pct}% full`;
+    $("#fullnessBar").style.width = `${pct}%`;
+    $("#spotsText").textContent = `${left} spots left`;
+  }
+
+  /* ===== RENDER CAMPERS ===== */
+  function renderCamperForms(){
+    const num = parseInt($("#numCampers").value,10)||0;
+    const container = $("#campersContainer");
+    container.innerHTML = "";
+
+    for(let i=1;i<=num;i++){
+      const el = document.createElement("div");
+      el.className = "camper-form";
+      el.innerHTML = `
+        <h2>Camper ${i}</h2>
+        <div class="grid two-col">
+          <label>Child's First Name <input type="text" name="childFirst${i}" /></label>
+          <label>Child's Last Name  <input type="text" name="childLast${i}" /></label>
         </div>
-        <div id="careOptions${i}" class="group hidden">
+        <div class="grid two-col">
+          <label>Child's Birthdate <input type="date" name="birthdate${i}" max="${todayISO()}" /></label>
+          <label>Child's Age (auto-calculated) <input type="text" name="childAge${i}" readonly /></label>
+        </div>
+        <hr />
+        <div class="group">
+          <strong>Select Days</strong>
+          <div id="days${i}" class="options"></div>
+        </div>
+        <hr />
+        <div class="group">
+          <strong>Do you require Before or After Camp Care?</strong>
           <div class="options">
-            <label class="opt"><input type="checkbox" data-kind="before" data-i="${i}" value="18" /> Before Camp Care ($18)</label>
-            <label class="opt"><input type="checkbox" data-kind="after"  data-i="${i}" value="25" /> After Camp Care ($25)</label>
+            <label class="opt"><input type="radio" name="careReq${i}" value="yes" /> Yes</label>
+            <label class="opt"><input type="radio" name="careReq${i}" value="no" checked /> No</label>
+          </div>
+          <div id="careOptions${i}" class="group hidden">
+            <div class="options">
+              <label class="opt"><input type="checkbox" data-kind="before" data-i="${i}" value="18" /> Before Camp Care ($18)</label>
+              <label class="opt"><input type="checkbox" data-kind="after"  data-i="${i}" value="25" /> After Camp Care ($25)</label>
+            </div>
           </div>
         </div>
-      </div>
-      <hr />
-      <div class="group">
-        <strong>Hot Lunch</strong>
-        <div class="options">
-          <label class="opt"><input type="radio" name="lunch${i}" value="6" /> Yes ($6)</label>
-          <label class="opt"><input type="radio" name="lunch${i}" value="0" checked /> No</label>
+        <hr />
+        <div class="group">
+          <strong>Hot Lunch</strong>
+          <div class="options">
+            <label class="opt"><input type="radio" name="lunch${i}" value="6" /> Yes ($6)</label>
+            <label class="opt"><input type="radio" name="lunch${i}" value="0" checked /> No</label>
+          </div>
         </div>
-      </div>
-      <hr />
-      <div class="group">
-        <strong>Allergies and Behavioral Considerations</strong>
-        <div class="options">
-          <label class="opt"><input type="radio" name="allergy${i}" value="yes" /> Yes</label>
-          <label class="opt"><input type="radio" name="allergy${i}" value="no" checked /> No</label>
-        </div>
-        <textarea id="allergyDetails${i}" class="hidden" placeholder="Please describe any allergies, medical care needs, or behavioral strategies that will help us best support your child at camp."></textarea>
-      </div>`;
-    container.appendChild(el);
+        <hr />
+        <div class="group">
+          <strong>Allergies and Behavioral Considerations</strong>
+          <div class="options">
+            <label class="opt"><input type="radio" name="allergy${i}" value="yes" /> Yes</label>
+            <label class="opt"><input type="radio" name="allergy${i}" value="no" checked /> No</label>
+          </div>
+          <textarea id="allergyDetails${i}" class="hidden" placeholder="Please describe any allergies, medical care needs, or behavioral strategies that will help us best support your child at camp."></textarea>
+        </div>`;
+      container.appendChild(el);
 
-    // Build day checkboxes (will be empty until rates arrive, but form still shows)
-    const daysWrap = el.querySelector("#days"+i);
-    dayLabels().forEach((label, idx)=>{
-      const span=document.createElement("span");
-      span.className="opt";
-      span.innerHTML = `<label class="opt"><input type="checkbox" data-day data-i="${i}" data-dayidx="${idx}"> ${label}</label>`;
-      daysWrap.appendChild(span);
-    });
-  }
-
-  container.onchange = (e)=>{
-    const t = e.target;
-    if(!(t instanceof HTMLInputElement)) return;
-
-    if (t.name && t.name.startsWith("careReq")){
-      const i=t.name.replace("careReq","");
-      const panel = document.getElementById("careOptions"+i);
-      if(t.value==="yes") panel.classList.remove("hidden");
-      else{
-        panel.classList.add("hidden");
-        ["before","after"].forEach(kind=>{
-          const box=document.querySelector(`input[data-kind="${kind}"][data-i="${i}"]`);
-          if(box) box.checked=false;
-        });
-      }
-    }
-    if (t.name && t.name.startsWith("allergy")){
-      const i=t.name.replace("allergy","");
-      const details=document.getElementById("allergyDetails"+i);
-      if(t.value==="yes") details.classList.remove("hidden"); else details.classList.add("hidden");
-    }
-    if (t.name && t.name.startsWith("birthdate")){
-      const i=t.name.replace("birthdate","");
-      const ageField=document.querySelector(`input[name="childAge${i}"]`);
-      if(ageField) ageField.value = calcAge(t.value);
-    }
-    updateTotal();
-  };
-
-  // Initialize ages if prefilled
-  const numNow = parseInt($("#numCampers").value,10)||0;
-  for(let i=1;i<=numNow;i++){
-    const bd=document.querySelector(`input[name="birthdate${i}"]`);
-    const ageField=document.querySelector(`input[name="childAge${i}"]`);
-    if(bd && bd.value && ageField) ageField.value = calcAge(bd.value);
-  }
-  updateTotal();
-}
-
-/* ===== STATE SAVE/RESTORE ===== */
-function captureState(){
-  const data={}; const campers=document.querySelectorAll(".camper-form");
-  campers.forEach((_,idx)=>{
-    const i=idx+1; data[i]={};
-    ["childFirst","childLast","birthdate","childAge"].forEach(f=>{
-      const el=document.querySelector(`[name='${f}${i}']`); if(el) data[i][f]=el.value;
-    });
-    const careReq=document.querySelector(`input[name='careReq${i}']:checked`); data[i].careReq = careReq?careReq.value:"no";
-    ["before","after"].forEach(kind=>{ const el=document.querySelector(`input[data-kind='${kind}'][data-i='${i}']`); data[i][kind]=el?!!el.checked:false; });
-    const lunch=document.querySelector(`input[name='lunch${i}']:checked`); data[i].lunch = lunch?lunch.value:"0";
-    const allergy=document.querySelector(`input[name='allergy${i}']:checked`); data[i].allergy = allergy?allergy.value:"no";
-    const ad=document.getElementById("allergyDetails"+i); data[i].allergyDetails = ad?ad.value:"";
-  });
-  return data;
-}
-function applyState(prev){
-  if(!prev) return;
-  const num=parseInt($("#numCampers").value,10)||0;
-  for(let i=1;i<=num;i++){
-    const p=prev[i]; if(!p) continue;
-    setVal(`childFirst${i}`, p.childFirst||""); setVal(`childLast${i}`, p.childLast||""); setVal(`birthdate${i}`, p.birthdate||"");
-    const ageField=document.querySelector(`input[name='childAge${i}']`); if(ageField) ageField.value = p.childAge || (p.birthdate?calcAge(p.birthdate):"");
-    checkRadio(`careReq${i}`, p.careReq||"no");
-    const panel=document.getElementById("careOptions"+i); if(panel){ if(p.careReq==="yes") panel.classList.remove("hidden"); else panel.classList.add("hidden"); }
-    setCheckbox("before", i, !!p.before); setCheckbox("after", i, !!p.after);
-    checkRadio(`lunch${i}`, p.lunch||"0");
-    const details=document.getElementById("allergyDetails"+i); if(details){ details.value=p.allergyDetails||""; if(p.allergy==="yes") details.classList.remove("hidden"); else details.classList.add("hidden"); }
-  }
-}
-function setVal(name,val){ const el=document.querySelector(`[name='${name}']`); if(el) el.value=val; }
-function checkRadio(name,value){ const el=document.querySelector(`input[name='${name}'][value='${value}']`); if(el) el.checked=true; }
-function setCheckbox(kind,i,checked){ const el=document.querySelector(`input[data-kind='${kind}'][data-i='${i}']`); if(el) el.checked=!!checked; }
-
-/* ===== TOTALS (multi-day) ===== */
-function selectedDaysForCamper(i){
-  return Array.from(document.querySelectorAll(`input[data-day][data-i="${i}"]:checked`))
-    .map(cb=>Number(cb.getAttribute("data-dayidx")));
-}
-function updateTotal(){
-  let total=0, discountSaved=0;
-  const num=parseInt($("#numCampers").value,10)||0;
-
-  for(let i=1;i<=num;i++){
-    const isFirst=(i===1);
-    const nDays = selectedDaysForCamper(i).length;
-
-    let base = priceForDays(nDays);
-    const sibDisc = isFirst ? 0 : base*SIBLING_DISCOUNT_RATE;
-    discountSaved += sibDisc; base -= sibDisc;
-
-    const before = document.querySelector(`input[data-kind="before"][data-i="${i}"]`)?.checked ? Number(RATES.BEFORE_CARE||0)*nDays : 0;
-    const after  = document.querySelector(`input[data-kind="after"][data-i="${i}"]`)?.checked  ? Number(RATES.AFTER_CARE||0) *nDays : 0;
-    const lunch  = (document.querySelector(`input[name="lunch${i}"]:checked`)?.value === "6") ? Number(RATES.HOT_LUNCH||0)*nDays : 0;
-
-    const camperTotal = (base + before + after + lunch) * promoMult();
-    total += camperTotal;
-  }
-  $("#total").textContent = total.toFixed(2);
-  const line=$("#discountLine"), savedEl=$("#discountSaved");
-  if(discountSaved>0){ savedEl.textContent=discountSaved.toFixed(2); line.classList.remove("hidden"); }
-  else { savedEl.textContent="0.00"; line.classList.add("hidden"); }
-  $("#checkoutButton").style.display = total>0 ? "inline-block" : "none";
-}
-
-/* ===== PROMO ===== */
-function applyPromo(){
-  const code = ($("#promoCode").value||"").trim().toUpperCase();
-  const pct = PROMO_CODES[code] || 0;
-  ACTIVE_PROMO_PCT = pct;
-  $("#promoMsg").textContent = pct>0 ? `${pct}% off applied.` : (code ? "Promo not recognized." : "");
-  updateTotal();
-}
-
-/* ===== CHECKOUT (unchanged logic except totals alignment) ===== */
-async function redirectToCheckout(){
-  if (!STRIPE_PUBLISHABLE_KEY) {
-    alert("Stripe not loaded. Add your publishable key.");
-    return;
-  }
-  if (!stripe) stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-
-  const total = parseFloat($("#total").textContent || "0");
-  if (total <= 0) {
-    alert("Please add at least one camper.");
-    return;
-  }
-
-  const parentFirstName = $("#parentFirstName").value.trim();
-  const parentLastName  = $("#parentLastName").value.trim();
-  const parentEmail     = $("#parentEmail").value.trim();
-  const parentPhone     = $("#parentPhone").value.trim();
-  const billingAddress  = $("#billingAddress").value.trim();
-
-  if (!parentFirstName || !parentLastName) {
-    alert("Please fill in the parent first and last name.");
-    return;
-  }
-  if (!parentEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail)) {
-    alert("Please enter a valid email address.");
-    return;
-  }
-  if (!parentPhone || parentPhone.replace(/[^\d]/g,"").length < 7) {
-    alert("Please enter a valid phone number.");
-    return;
-  }
-
-  const lineItems = buildLineItems();
-  const reg       = gatherRegistrationData();
-
-  // 1) Build the "options" array your sheet expects
-  const selectionLines = reg.campers.map((c, i) => {
-    const o = [];
-    if (c.beforeCare) o.push("Before");
-    if (c.afterCare)  o.push("After");
-    if (c.hotLunch)   o.push("Lunch");
-    return o.length ? `Camper ${i+1}: ${o.join(", ")}` : "";
-  }).filter(Boolean);
-
-  // 2) Collect selected day labels per camper
-  const selectedDaysAll = [];
-  const nCampers = parseInt($("#numCampers").value, 10) || 0;
-  for (let i = 1; i <= nCampers; i++) {
-    const idxs   = selectedDaysForCamper(i);
-    const labels = idxs.map(idx => dayLabels()[idx]);
-    selectedDaysAll.push({ camper: i, days: labels });
-  }
-
-  // 3) Payload sent to Netlify (and then Apps Script)
-  const payload = {
-    // parent
-    parentName: `${parentFirstName} ${parentLastName}`.trim(),
-    parentEmail,
-    phone: parentPhone,
-
-    // first camper only (sheet uses these two columns)
-    camperFirst: reg.campers[0]?.firstName || "",
-    camperLast:  reg.campers[0]?.lastName  || "",
-
-    // sheet/flow context
-    campSheet: CAMP_SHEET,      // <- "Winter"
-    week: "",                   // leave blank unless you use it
-    selectedDays: selectedDaysAll,
-    options: selectionLines,
-
-    // money
-    siblings: Math.max(0, nCampers - 1),
-    subtotal: reg.total,
-    discounts: 0,
-    total: reg.total,
-
-    // Stripe/session fields
-    status: "PENDING",
-    sessionId: "",
-    checkoutUrl: "",
-
-    // NEW: extra info for your new columns
-    billingAddress,
-    registrationData: reg,      // includes birthdate, age, notes, etc.
-    camp: "winter",
-
-    // keep your Stripe items for the Netlify function
-    line_items: lineItems,
-    success_url: window.location.origin + "/camp/success/",
-    cancel_url:  window.location.origin + "/camp/cancelled/"
-  };
-
-  const res = await fetch(FUNCTION_URL, {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify(payload)
-  });
-
-  if (!res.ok) {
-    throw new Error(await res.text() || "Checkout session failed");
-  }
-
-  const { url } = await res.json();
-  window.location.href = url;
-}
-
-function buildLineItems(){
-  const items=[];
-  const n=parseInt($("#numCampers").value,10)||0;
-  for(let i=1;i<=n;i++){
-    const firstName = document.querySelector(`[name="childFirst${i}"]`)?.value || "Camper";
-    const lastName  = document.querySelector(`[name="childLast${i}"]`)?.value || String(i);
-    const isFirst   = (i===1);
-    const nDays     = selectedDaysForCamper(i).length;
-
-    let base = priceForDays(nDays);
-    if(!isFirst) base *= (1 - SIBLING_DISCOUNT_RATE);
-    base *= promoMult();
-    if(base>0){
-      items.push({
-        price_data:{ currency:"usd", product_data:{ name:`Camp (${nDays} day${nDays>1?"s":""}) - ${firstName} ${lastName}${!isFirst?" (Sibling)":""}` }, unit_amount: Math.round(base*100) },
-        quantity:1
+      const daysWrap = el.querySelector("#days"+i);
+      dayLabels().forEach((label, idx)=>{
+        const span=document.createElement("span");
+        span.className="opt";
+        span.innerHTML = `<label class="opt"><input type="checkbox" data-day data-i="${i}" data-dayidx="${idx}"> ${label}</label>`;
+        daysWrap.appendChild(span);
       });
     }
 
-    const before = document.querySelector(`input[data-kind="before"][data-i="${i}"]`)?.checked;
-    const after  = document.querySelector(`input[data-kind="after"][data-i="${i}"]`)?.checked;
-    const lunchY = (document.querySelector(`input[name="lunch${i}"]:checked`)?.value === "6");
+    container.onchange = (e)=>{
+      const t = e.target;
+      if(!(t instanceof HTMLInputElement)) return;
 
-    if(before && RATES.BEFORE_CARE && nDays>0){
-      items.push({ price_data:{currency:"usd", product_data:{name:`Before Care - ${firstName} ${lastName}`}, unit_amount: Math.round(RATES.BEFORE_CARE*promoMult()*100)}, quantity:nDays });
-    }
-    if(after && RATES.AFTER_CARE && nDays>0){
-      items.push({ price_data:{currency:"usd", product_data:{name:`After Care - ${firstName} ${lastName}`}, unit_amount: Math.round(RATES.AFTER_CARE*promoMult()*100)}, quantity:nDays });
-    }
-    if(lunchY && RATES.HOT_LUNCH && nDays>0){
-      items.push({ price_data:{currency:"usd", product_data:{name:`Hot Lunch - ${firstName} ${lastName}`}, unit_amount: Math.round(RATES.HOT_LUNCH*promoMult()*100)}, quantity:nDays });
-    }
-  }
-  return items;
-}
-
-/* ===== DATA GATHER ===== */
-function gatherRegistrationData(){
-  const data={
-    parent:{ firstName:$("#parentFirstName").value, lastName:$("#parentLastName").value, billingAddress:$("#billingAddress").value },
-    campers:[],
-    total: parseFloat($("#total").textContent||"0")
-  };
-  const num=parseInt($("#numCampers").value,10)||0;
-  for(let i=1;i<=num;i++){
-    data.campers.push({
-      firstName: document.querySelector(`[name="childFirst${i}"]`)?.value || "",
-      lastName:  document.querySelector(`[name="childLast${i}"]`)?.value  || "",
-      birthdate: document.querySelector(`[name="birthdate${i}"]`)?.value  || "",
-      age:       document.querySelector(`[name="childAge${i}"]`)?.value   || "",
-      beforeCare: document.querySelector(`input[data-kind="before"][data-i="${i}"]`)?.checked || false,
-      afterCare:  document.querySelector(`input[data-kind="after"][data-i="${i}"]`)?.checked  || false,
-      hotLunch:   document.querySelector(`input[name="lunch${i}"]:checked`)?.value === "6",
-      hasAllergies: document.querySelector(`input[name="allergy${i}"]:checked`)?.value === "yes",
-      allergyDetails: document.getElementById(`allergyDetails${i}`)?.value || ""
-    });
-  }
-  return data;
-}
-
-/* ===== INIT (force forms render) ===== */
-(function init(){
-  try{
-    // initial form render so UI never looks empty
-    renderCamperForms();
-    updateTotal();
-    // wire listeners
-    $("#numCampers").addEventListener("change", ()=>{
-      CAMPER_STATE = captureState();
-      renderCamperForms();
-      applyState(CAMPER_STATE);
+      if (t.name && t.name.startsWith("careReq")){
+        const i=t.name.replace("careReq","");
+        const panel = document.getElementById("careOptions"+i);
+        if(t.value==="yes") panel.classList.remove("hidden");
+        else{
+          panel.classList.add("hidden");
+          ["before","after"].forEach(kind=>{
+            const box=document.querySelector(`input[data-kind="${kind}"][data-i="${i}"]`);
+            if(box) box.checked=false;
+          });
+        }
+      }
+      if (t.name && t.name.startsWith("allergy")){
+        const i=t.name.replace("allergy","");
+        const details=document.getElementById("allergyDetails"+i);
+        if(t.value==="yes") details.classList.remove("hidden"); else details.classList.add("hidden");
+      }
+      if (t.name && t.name.startsWith("birthdate")){
+        const i=t.name.replace("birthdate","");
+        const ageField=document.querySelector(`input[name="childAge${i}"]`);
+        if(ageField) ageField.value = calcAge(t.value);
+      }
       updateTotal();
-    });
-    $("#applyPromoBtn").addEventListener("click", applyPromo);
-    $("#promoCode").addEventListener("keydown", e=>{ if(e.key==="Enter") applyPromo(); });
-    $("#checkoutButton").addEventListener("click", ()=>redirectToCheckout().catch(err=>{ console.error(err); alert(err.message||err); }));
-    if(STRIPE_PUBLISHABLE_KEY) stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+    };
 
-    // async fetches (won't block UI)
-    loadRates().catch(e=>console.error("rates load failed", e));
-    safeLoadCapacity();
-    updateFullness();
-  }catch(e){
-    console.error("init error", e);
+    // Initialize ages if prefilled
+    const numNow = parseInt($("#numCampers").value,10)||0;
+    for(let i=1;i<=numNow;i++){
+      const bd=document.querySelector(`input[name="birthdate${i}"]`);
+      const ageField=document.querySelector(`input[name="childAge${i}"]`);
+      if(bd && bd.value && ageField) ageField.value = calcAge(bd.value);
+    }
+    updateTotal();
   }
-})();
-</script>
+
+  /* ===== STATE SAVE/RESTORE ===== */
+  function captureState(){
+    const data={}; const campers=document.querySelectorAll(".camper-form");
+    campers.forEach((_,idx)=>{
+      const i=idx+1; data[i]={};
+      ["childFirst","childLast","birthdate","childAge"].forEach(f=>{
+        const el=document.querySelector(`[name='${f}${i}']`); if(el) data[i][f]=el.value;
+      });
+      const careReq=document.querySelector(`input[name='careReq${i}']:checked`); data[i].careReq = careReq?careReq.value:"no";
+      ["before","after"].forEach(kind=>{ const el=document.querySelector(`input[data-kind='${kind}'][data-i='${i}']`); data[i][kind]=el?!!el.checked:false; });
+      const lunch=document.querySelector(`input[name='lunch${i}']:checked`); data[i].lunch = lunch?lunch.value:"0";
+      const allergy=document.querySelector(`input[name='allergy${i}']:checked`); data[i].allergy = allergy?allergy.value:"no";
+      const ad=document.getElementById("allergyDetails"+i); data[i].allergyDetails = ad?ad.value:"";
+    });
+    return data;
+  }
+  function applyState(prev){
+    if(!prev) return;
+    const num=parseInt($("#numCampers").value,10)||0;
+    for(let i=1;i<=num;i++){
+      const p=prev[i]; if(!p) continue;
+      setVal(`childFirst${i}`, p.childFirst||""); setVal(`childLast${i}`, p.childLast||""); setVal(`birthdate${i}`, p.birthdate||"");
+      const ageField=document.querySelector(`input[name='childAge${i}']`); if(ageField) ageField.value = p.childAge || (p.birthdate?calcAge(p.birthdate):"");
+      checkRadio(`careReq${i}`, p.careReq||"no");
+      const panel=document.getElementById("careOptions"+i); if(panel){ if(p.careReq==="yes") panel.classList.remove("hidden"); else panel.classList.add("hidden"); }
+      setCheckbox("before", i, !!p.before); setCheckbox("after", i, !!p.after);
+      checkRadio(`lunch${i}`, p.lunch||"0");
+      const details=document.getElementById("allergyDetails"+i); if(details){ details.value=p.allergyDetails||""; if(p.allergy==="yes") details.classList.remove("hidden"); else details.classList.add("hidden"); }
+    }
+  }
+  function setVal(name,val){ const el=document.querySelector(`[name='${name}']`); if(el) el.value=val; }
+  function checkRadio(name,value){ const el=document.querySelector(`input[name='${name}'][value='${value}']`); if(el) el.checked=true; }
+  function setCheckbox(kind,i,checked){ const el=document.querySelector(`input[data-kind='${kind}'][data-i='${i}']`); if(el) el.checked=!!checked; }
+
+  /* ===== TOTALS (multi-day) ===== */
+  function selectedDaysForCamper(i){
+    return Array.from(document.querySelectorAll(`input[data-day][data-i="${i}"]:checked`))
+      .map(cb=>Number(cb.getAttribute("data-dayidx")));
+  }
+  function updateTotal(){
+    let total=0, discountSaved=0;
+    const num=parseInt($("#numCampers").value,10)||0;
+
+    for(let i=1;i<=num;i++){
+      const isFirst=(i===1);
+      const nDays = selectedDaysForCamper(i).length;
+
+      let base = priceForDays(nDays);
+      const sibDisc = isFirst ? 0 : base*SIBLING_DISCOUNT_RATE;
+      discountSaved += sibDisc; base -= sibDisc;
+
+      const before = document.querySelector(`input[data-kind="before"][data-i="${i}"]`)?.checked ? Number(RATES.BEFORE_CARE||0)*nDays : 0;
+      const after  = document.querySelector(`input[data-kind="after"][data-i="${i}"]`)?.checked  ? Number(RATES.AFTER_CARE||0) *nDays : 0;
+      const lunch  = (document.querySelector(`input[name="lunch${i}"]:checked`)?.value === "6") ? Number(RATES.HOT_LUNCH||0)*nDays : 0;
+
+      const camperTotal = (base + before + after + lunch) * promoMult();
+      total += camperTotal;
+    }
+    $("#total").textContent = total.toFixed(2);
+    const line=$("#discountLine"), savedEl=$("#discountSaved");
+    if(discountSaved>0){ savedEl.textContent=discountSaved.toFixed(2); line.classList.remove("hidden"); }
+    else { savedEl.textContent="0.00"; line.classList.add("hidden"); }
+    $("#checkoutButton").style.display = total>0 ? "inline-block" : "none";
+  }
+
+  /* ===== PROMO ===== */
+  function applyPromo(){
+    const code = ($("#promoCode").value||"").trim().toUpperCase();
+    const pct = PROMO_CODES[code] || 0;
+    ACTIVE_PROMO_PCT = pct;
+    $("#promoMsg").textContent = pct>0 ? `${pct}% off applied.` : (code ? "Promo not recognized." : "");
+    updateTotal();
+  }
+
+  /* ===== CHECKOUT ===== */
+  async function redirectToCheckout(){
+    if(!STRIPE_PUBLISHABLE_KEY){ alert("Stripe not loaded. Add your publishable key."); return; }
+    if(!stripe) stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+
+    const total = parseFloat($("#total").textContent||"0");
+    if(total<=0){ alert("Please add at least one camper."); return; }
+
+    const parentFirstName = $("#parentFirstName").value.trim();
+    const parentLastName  = $("#parentLastName").value.trim();
+    const parentEmail     = $("#parentEmail").value.trim();
+    const parentPhone     = $("#parentPhone").value.trim();
+
+    if(!parentFirstName || !parentLastName){
+      alert("Please fill in the parent first and last name."); return;
+    }
+    if(!parentEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail)){
+      alert("Please enter a valid email address."); return;
+    }
+    if(!parentPhone || parentPhone.replace(/[^\d]/g,"").length < 7){
+      alert("Please enter a valid phone number."); return;
+    }
+
+    const lineItems = buildLineItems();
+    const reg = gatherRegistrationData();
+
+    // 1) Build the "options" array your sheet expects
+    const selectionLines = reg.campers.map((c,i) => {
+      const o = [];
+      if (c.beforeCare) o.push("Before");
+      if (c.afterCare)  o.push("After");
+      if (c.hotLunch)   o.push("Lunch");
+      return o.length ? `Camper ${i+1}: ${o.join(", ")}` : "";
+    }).filter(Boolean);
+
+    // 2) Collect selected day labels per camper (your doPost flattens this)
+    const selectedDaysAll = [];
+    const nCampers = parseInt($("#numCampers").value,10) || 0;
+    for (let i = 1; i <= nCampers; i++) {
+      const idxs   = selectedDaysForCamper(i);
+      const labels = idxs.map(idx => dayLabels()[idx]);
+      selectedDaysAll.push({ camper: i, days: labels });
+    }
+
+    // 3) Send EXACT keys your Apps Script expects
+    const payload = {
+      // parent
+      parentName: `${parentFirstName} ${parentLastName}`.trim(),
+      parentEmail,
+      phone: parentPhone,
+
+      // first camper only
+      camperFirst: reg.campers[0]?.firstName || "",
+      camperLast:  reg.campers[0]?.lastName  || "",
+
+      // sheet/flow context
+      campSheet: CAMP_SHEET,
+      week: "",
+      selectedDays: selectedDaysAll,
+      options: selectionLines,
+
+      // money
+      siblings: Math.max(0, nCampers - 1),
+      subtotal: reg.total,
+      discounts: 0,
+      total: reg.total,
+
+      // Stripe/session fields (Apps Script has safe defaults if left blank)
+      status: "PENDING",
+      sessionId: "",
+      checkoutUrl: "",
+
+      // Stripe-specific
+      line_items: lineItems,
+
+      // 🔥 Winter-specific redirect URLs:
+      success_url: "https://www.campsforkidsidaho.com/confirmation.html?session_id={CHECKOUT_SESSION_ID}",
+      cancel_url:  "https://bimcampcheckout.netlify.app/winter.html",
+
+      // Extra structured data
+      registrationData: reg
+    };
+
+    const res = await fetch(FUNCTION_URL, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(payload)
+    });
+    if(!res.ok) throw new Error(await res.text()||"Checkout session failed");
+    const { url } = await res.json();
+    window.location.href = url;
+  }
+
+  function buildLineItems(){
+    const items=[];
+    const n=parseInt($("#numCampers").value,10)||0;
+    for(let i=1;i<=n;i++){
+      const firstName = document.querySelector(`[name="childFirst${i}"]`)?.value || "Camper";
+      const lastName  = document.querySelector(`[name="childLast${i}"]`)?.value || String(i);
+      const isFirst   = (i===1);
+      const nDays     = selectedDaysForCamper(i).length;
+
+      let base = priceForDays(nDays);
+      if(!isFirst) base *= (1 - SIBLING_DISCOUNT_RATE);
+      base *= promoMult();
+      if(base>0){
+        items.push({
+          price_data:{
+            currency:"usd",
+            product_data:{ name:`Camp (${nDays} day${nDays>1?"s":""}) - ${firstName} ${lastName}${!isFirst?" (Sibling)":""}` },
+            unit_amount: Math.round(base*100)
+          },
+          quantity:1
+        });
+      }
+
+      const before = document.querySelector(`input[data-kind="before"][data-i="${i}"]`)?.checked;
+      const after  = document.querySelector(`input[data-kind="after"][data-i="${i}"]`)?.checked;
+      const lunchY = (document.querySelector(`input[name="lunch${i}"]:checked`)?.value === "6");
+
+      if(before && RATES.BEFORE_CARE && nDays>0){
+        items.push({
+          price_data:{
+            currency:"usd",
+            product_data:{name:`Before Care - ${firstName} ${lastName}`},
+            unit_amount: Math.round(RATES.BEFORE_CARE*promoMult()*100)
+          },
+          quantity:nDays
+        });
+      }
+      if(after && RATES.AFTER_CARE && nDays>0){
+        items.push({
+          price_data:{
+            currency:"usd",
+            product_data:{name:`After Care - ${firstName} ${lastName}`},
+            unit_amount: Math.round(RATES.AFTER_CARE*promoMult()*100)
+          },
+          quantity:nDays
+        });
+      }
+      if(lunchY && RATES.HOT_LUNCH && nDays>0){
+        items.push({
+          price_data:{
+            currency:"usd",
+            product_data:{name:`Hot Lunch - ${firstName} ${lastName}`},
+            unit_amount: Math.round(RATES.HOT_LUNCH*promoMult()*100)
+          },
+          quantity:nDays
+        });
+      }
+    }
+    return items;
+  }
+
+  /* ===== DATA GATHER ===== */
+  function gatherRegistrationData(){
+    const data={
+      parent:{
+        firstName: $("#parentFirstName").value,
+        lastName: $("#parentLastName").value,
+        billingAddress: $("#billingAddress").value
+      },
+      campers:[],
+      total: parseFloat($("#total").textContent||"0"),
+      // Added address breakdown for Winter sheet
+      address: $("#billingAddress").value,
+      city: $("#city").value,
+      state: $("#state").value,
+      zip: $("#zip").value
+    };
+    const num=parseInt($("#numCampers").value,10)||0;
+    for(let i=1;i<=num;i++){
+      data.campers.push({
+        firstName: document.querySelector(`[name="childFirst${i}"]`)?.value || "",
+        lastName:  document.querySelector(`[name="childLast${i}"]`)?.value  || "",
+        birthdate: document.querySelector(`[name="birthdate${i}"]`)?.value  || "",
+        age:       document.querySelector(`[name="childAge${i}"]`)?.value   || "",
+        beforeCare: document.querySelector(`input[data-kind="before"][data-i="${i}"]`)?.checked || false,
+        afterCare:  document.querySelector(`input[data-kind="after"][data-i="${i}"]`)?.checked  || false,
+        hotLunch:   document.querySelector(`input[name="lunch${i}"]:checked`)?.value === "6",
+        hasAllergies: document.querySelector(`input[name="allergy${i}"]:checked`)?.value === "yes",
+        allergyDetails: document.getElementById(`allergyDetails${i}`)?.value || ""
+      });
+    }
+    return data;
+  }
+
+  /* ===== INIT ===== */
+  (function init(){
+    try{
+      renderCamperForms();
+      updateTotal();
+
+      $("#numCampers").addEventListener("change", ()=>{
+        CAMPER_STATE = captureState();
+        renderCamperForms();
+        applyState(CAMPER_STATE);
+        updateTotal();
+      });
+      $("#applyPromoBtn").addEventListener("click", applyPromo);
+      $("#promoCode").addEventListener("keydown", e=>{ if(e.key==="Enter") applyPromo(); });
+      $("#checkoutButton").addEventListener("click", ()=>redirectToCheckout().catch(err=>{ console.error(err); alert(err.message||err); }));
+      if(STRIPE_PUBLISHABLE_KEY) stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+
+      loadRates().catch(e=>console.error("rates load failed", e));
+      safeLoadCapacity();
+      updateFullness();
+    }catch(e){
+      console.error("init error", e);
+    }
+  })();
+  </script>
 </body>
 </html>
-
