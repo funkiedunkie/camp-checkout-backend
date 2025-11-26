@@ -40,7 +40,7 @@
     select, textarea {
       box-sizing: border-box;
       width: 100%;
-      height: 40px;  /* consistent height for all fields */
+      height: 40px;
       padding: 8px 10px;
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -148,14 +148,11 @@
   const PROMO_CODES = { SAVE10:10, SAVE15:15, MEMBER20:20, TEST99:99 };
   let ACTIVE_PROMO_PCT = 0;
 
-  // Apps Script endpoint (not currently used directly here, kept in case)
   const EXEC_URL = "https://script.google.com/macros/s/AKfycbyEWnlhQfWxRB-dRGMHdEW06jLVvEJid4uh9iPWMQLu0hMdGmg3_QHz5kTBJN2GRa_A/exec";
 
-  // Capacity display (safe defaults; will try to update)
   let CAPACITY = 40;
   let REGISTERED = 8;
 
-  // Stripe
   const STRIPE_PUBLISHABLE_KEY = 'pk_live_51HHwvJHkXHsAaBd2i1rZtByJB18GIbUxWx3iQz4JrsV1jejOaZxPGVI30fWij6mJCZgkoRwZtMpndHRvL9vvBbgh0007i0FTs2';
   let stripe;
   const NETLIFY_ORIGIN = "https://bimcampcheckout.netlify.app";
@@ -165,8 +162,8 @@
 
   /* ===== STATE ===== */
   let CAMPER_STATE = {};
-  let RATES = {};                // loaded from GET_RATES_URL
-  const CAMP_SHEET = "Winter2025";  // <--- CHANGED from Thanksgiving2025
+  let RATES = {};
+  const CAMP_SHEET = "Winter2025";
 
   /* ===== UTIL ===== */
   const $ = sel => document.querySelector(sel);
@@ -191,7 +188,7 @@
     const r = await fetch(GET_RATES_URL, { cache: 'no-store' });
     if(!r.ok) throw new Error("rates HTTP "+r.status);
     RATES = await r.json();
-    renderCamperForms();   // build day lists once we have labels
+    renderCamperForms();
     updateTotal();
   }
   function dayLabels(){
@@ -209,7 +206,7 @@
   let _capFetchInFlight = false;
 
   async function safeLoadCapacity(){
-    if (_capFetchInFlight) return;     // prevent double-calls
+    if (_capFetchInFlight) return;
     _capFetchInFlight = true;
 
     const textEl = document.getElementById('fullnessText');
@@ -227,12 +224,11 @@
       const cap     = Number.isFinite(d.capacity) ? Number(d.capacity) : CAPACITY;
 
       REGISTERED = Math.max(0, paid + pending);
-      CAPACITY   = Math.max(1, cap);   // avoid zero
+      CAPACITY   = Math.max(1, cap);
     } catch (e) {
       console.warn('capacity fetch failed', e);
-      // no UI overwrite; we’ll render with whatever values we have
     } finally {
-      updateFullness();                // always render something
+      updateFullness();
       _capFetchInFlight = false;
     }
   }
@@ -344,7 +340,6 @@
       updateTotal();
     };
 
-    // Initialize ages if prefilled
     const numNow = parseInt($("#numCampers").value,10)||0;
     for(let i=1;i<=numNow;i++){
       const bd=document.querySelector(`input[name="birthdate${i}"]`);
@@ -388,7 +383,7 @@
   function checkRadio(name,value){ const el=document.querySelector(`input[name='${name}'][value='${value}']`); if(el) el.checked=true; }
   function setCheckbox(kind,i,checked){ const el=document.querySelector(`input[data-kind='${kind}'][data-i='${i}']`); if(el) el.checked=!!checked; }
 
-  /* ===== TOTALS (multi-day) ===== */
+  /* ===== TOTALS ===== */
   function selectedDaysForCamper(i){
     return Array.from(document.querySelectorAll(`input[data-day][data-i="${i}"]:checked`))
       .map(cb=>Number(cb.getAttribute("data-dayidx")));
@@ -454,7 +449,6 @@
     const lineItems = buildLineItems();
     const reg = gatherRegistrationData();
 
-    // 1) Build the "options" array your sheet expects
     const selectionLines = reg.campers.map((c,i) => {
       const o = [];
       if (c.beforeCare) o.push("Before");
@@ -463,7 +457,6 @@
       return o.length ? `Camper ${i+1}: ${o.join(", ")}` : "";
     }).filter(Boolean);
 
-    // 2) Collect selected day labels per camper (your doPost flattens this)
     const selectedDaysAll = [];
     const nCampers = parseInt($("#numCampers").value,10) || 0;
     for (let i = 1; i <= nCampers; i++) {
@@ -472,42 +465,33 @@
       selectedDaysAll.push({ camper: i, days: labels });
     }
 
-    // 3) Send EXACT keys your Apps Script expects
     const payload = {
-      // parent
       parentName: `${parentFirstName} ${parentLastName}`.trim(),
       parentEmail,
       phone: parentPhone,
 
-      // first camper only
       camperFirst: reg.campers[0]?.firstName || "",
       camperLast:  reg.campers[0]?.lastName  || "",
 
-      // sheet/flow context
       campSheet: CAMP_SHEET,
       week: "",
       selectedDays: selectedDaysAll,
       options: selectionLines,
 
-      // money
       siblings: Math.max(0, nCampers - 1),
       subtotal: reg.total,
       discounts: 0,
       total: reg.total,
 
-      // Stripe/session fields (Apps Script has safe defaults if left blank)
       status: "PENDING",
       sessionId: "",
       checkoutUrl: "",
 
-      // Stripe-specific
       line_items: lineItems,
 
-      // 🔥 Winter-specific redirect URLs:
       success_url: "https://www.campsforkidsidaho.com/confirmation.html?session_id={CHECKOUT_SESSION_ID}",
       cancel_url:  "https://bimcampcheckout.netlify.app/winter.html",
 
-      // Extra structured data
       registrationData: reg
     };
 
@@ -582,43 +566,48 @@
     return items;
   }
 
- function gatherRegistrationData() {
-  const data = {
-    parent: {
-      firstName: $("#parentFirstName").value,
-      lastName:  $("#parentLastName").value,
-      email:     $("#parentEmail").value,
-      phone:     $("#parentPhone").value,
-      billingAddress: $("#billingAddress").value
-    },
-    // root-level address fields so Apps Script can read them
-    address: $("#address").value,
-    city:    $("#city").value,
-    state:   $("#state").value,
-    zip:     $("#zip").value,
+  /* ===== REGISTRATION DATA (FIXED ADDR) ===== */
+  function gatherRegistrationData() {
+    const addrEl  = $("#billingAddress");
+    const cityEl  = $("#city");
+    const stateEl = $("#state");
+    const zipEl   = $("#zip");
 
-    campers: [],
-    total: parseFloat($("#total").textContent || "0")
-  };
+    const data = {
+      parent: {
+        firstName: $("#parentFirstName")?.value || "",
+        lastName:  $("#parentLastName")?.value  || "",
+        email:     $("#parentEmail")?.value     || "",
+        phone:     $("#parentPhone")?.value     || "",
+        billingAddress: $("#billingAddress")?.value || ""
+      },
+      // root-level address fields Apps Script reads (address uses billing street)
+      address: addrEl  ? addrEl.value  : "",
+      city:    cityEl  ? cityEl.value  : "",
+      state:   stateEl ? stateEl.value : "",
+      zip:     zipEl   ? zipEl.value   : "",
 
-  const num = parseInt($("#numCampers").value, 10) || 0;
-  for (let i = 1; i <= num; i++) {
-    data.campers.push({
-      firstName:      document.querySelector(`[name="childFirst${i}"]`)?.value || "",
-      lastName:       document.querySelector(`[name="childLast${i}"]`)?.value  || "",
-      birthdate:      document.querySelector(`[name="birthdate${i}"]`)?.value  || "",
-      age:            document.querySelector(`[name="childAge${i}"]`)?.value   || "",
-      beforeCare:     document.querySelector(`input[data-kind="before"][data-i="${i}"]`)?.checked || false,
-      afterCare:      document.querySelector(`input[data-kind="after"][data-i="${i}"]`)?.checked  || false,
-      hotLunch:       document.querySelector(`input[name="lunch${i}"]:checked`)?.value === "6",
-      hasAllergies:   document.querySelector(`input[name="allergy${i}"]:checked`)?.value === "yes",
-      allergyDetails: document.getElementById(`allergyDetails${i}`)?.value || ""
-    });
+      campers: [],
+      total: parseFloat($("#total")?.textContent || "0")
+    };
+
+    const num = parseInt($("#numCampers").value, 10) || 0;
+    for (let i = 1; i <= num; i++) {
+      data.campers.push({
+        firstName:      document.querySelector(`[name="childFirst${i}"]`)?.value || "",
+        lastName:       document.querySelector(`[name="childLast${i}"]`)?.value  || "",
+        birthdate:      document.querySelector(`[name="birthdate${i}"]`)?.value  || "",
+        age:            document.querySelector(`[name="childAge${i}"]`)?.value   || "",
+        beforeCare:     document.querySelector(`input[data-kind="before"][data-i="${i}"]`)?.checked || false,
+        afterCare:      document.querySelector(`input[data-kind="after"][data-i="${i}"]`)?.checked  || false,
+        hotLunch:       document.querySelector(`input[name="lunch${i}"]:checked`)?.value === "6",
+        hasAllergies:   document.querySelector(`input[name="allergy${i}"]:checked`)?.value === "yes",
+        allergyDetails: document.getElementById(`allergyDetails${i}`)?.value || ""
+      });
+    }
+
+    return data;
   }
-
-  return data;
-}
-
 
   /* ===== INIT ===== */
   (function init(){
@@ -647,3 +636,4 @@
   </script>
 </body>
 </html>
+
