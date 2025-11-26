@@ -1,6 +1,10 @@
 // netlify/functions/_sheets.js
 const { google } = require('googleapis');
 
+// HARD-CODED for Winter 2025
+const SHEET_ID = '1h4CeyR0wIt59HUDhXvMPQfLpAydfytJYRc9tjAXatkw';
+const TAB_NAME = 'Winter2025';
+
 function getSheetsClient() {
   const jwt = new google.auth.JWT(
     process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
@@ -29,7 +33,10 @@ function headerMatches(headerValue, target) {
 
 function headerMatchesSuffix(headerValue, suffix) {
   const normalized = normalizeForComparison(headerValue);
-  return normalized === normalizeForComparison(suffix) || normalized.endsWith(normalizeForComparison(suffix));
+  return (
+    normalized === normalizeForComparison(suffix) ||
+    normalized.endsWith(normalizeForComparison(suffix))
+  );
 }
 
 function findHeaderIndex(headerRow, target) {
@@ -37,13 +44,13 @@ function findHeaderIndex(headerRow, target) {
 
   const targets = Array.isArray(target) ? target : [target];
 
-  // First pass: look for exact matches against the provided targets.
+  // First pass: exact matches
   for (const candidate of targets) {
     const idx = headerRow.findIndex(h => headerMatches(h, candidate));
     if (idx !== -1) return idx;
   }
 
-  // Second pass: allow suffix matches so "Stripe Session Id" resolves to "SessionID".
+  // Second pass: suffix matches (e.g. "Stripe Session Id" -> "SessionID")
   for (const candidate of targets) {
     const idx = headerRow.findIndex(h => headerMatchesSuffix(h, candidate));
     if (idx !== -1) return idx;
@@ -63,55 +70,73 @@ function columnNumberToLetter(num) {
   return result || 'A';
 }
 
+/**
+ * Read all values from Winter2025!A:Z
+ */
 async function fetchSheetValues() {
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: 'Registrations!A:Z',
+    spreadsheetId: SHEET_ID,
+    range: `${TAB_NAME}!A:Z`,
   });
   const rows = res.data.values || [];
   const header = rows[0] || [];
   return { header, rows };
 }
 
+/**
+ * Append one row to Winter2025
+ */
 async function appendRow(values) {
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.append({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: 'Registrations!A:Z',
+    spreadsheetId: SHEET_ID,
+    range: `${TAB_NAME}!A:Z`,
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [values] },
   });
   return res.data;
 }
 
+/**
+ * Find a row by SessionID (in Winter2025)
+ */
 async function findRowBySessionId(sessionId) {
   const { header, rows } = await fetchSheetValues();
   const idx = findHeaderIndex(header, 'SessionID');
   if (idx === -1) return { rowIndex: -1, headerIndex: -1, header, rows };
+
   for (let i = 1; i < rows.length; i++) {
     const cellValue = normalizeCellValue(rows[i][idx]);
     if (cellValue && cellValue === normalizeCellValue(sessionId)) {
+      // rowIndex is 1-based in Sheets
       return { rowIndex: i + 1, headerIndex: idx, header, rows };
     }
   }
   return { rowIndex: -1, headerIndex: idx, header, rows };
 }
 
+/**
+ * Update a full row (by 1-based index) in Winter2025
+ */
 async function updateRow(rowIndex, values) {
   const sheets = getSheetsClient();
   await sheets.spreadsheets.values.update({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `Registrations!A${rowIndex}:Z${rowIndex}`,
+    spreadsheetId: SHEET_ID,
+    range: `${TAB_NAME}!A${rowIndex}:Z${rowIndex}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [values] },
   });
 }
 
+/**
+ * Return all rows as array of objects keyed by header
+ */
 async function getSheet() {
   const { header, rows } = await fetchSheetValues();
   if (rows.length <= 1) return [];
   const normalizedHeader = header.map(normalizeHeaderValue);
+
   return rows.slice(1).map(row => {
     const obj = {};
     for (let i = 0; i < normalizedHeader.length; i++) {
@@ -122,10 +147,14 @@ async function getSheet() {
   });
 }
 
+/**
+ * Same as getSheet but also returns the actual row index in the sheet
+ */
 async function listRegistrationsWithRowIndex() {
   const { header, rows } = await fetchSheetValues();
   if (rows.length <= 1) return [];
   const normalizedHeader = header.map(normalizeHeaderValue);
+
   return rows.slice(1).map((row, idx) => {
     const data = {};
     for (let i = 0; i < normalizedHeader.length; i++) {
@@ -136,10 +165,16 @@ async function listRegistrationsWithRowIndex() {
   });
 }
 
+/**
+ * Flip Status / PaymentStatus for a given Stripe session
+ */
 async function updateStatusBySessionId(sessionId, status, extraFields = {}) {
   const { rowIndex, headerIndex, header, rows } = await findRowBySessionId(sessionId);
   if (rowIndex === -1) {
-    return { ok: false, reason: headerIndex === -1 ? 'SESSION_COLUMN_MISSING' : 'SESSION_NOT_FOUND' };
+    return {
+      ok: false,
+      reason: headerIndex === -1 ? 'SESSION_COLUMN_MISSING' : 'SESSION_NOT_FOUND',
+    };
   }
 
   const statusIdx = findHeaderIndex(header, ['Status', 'PaymentStatus']);
@@ -150,12 +185,15 @@ async function updateStatusBySessionId(sessionId, status, extraFields = {}) {
   const rowArrayLength = Math.max(header.length, rows[rowIndex - 1]?.length || 0);
   const normalizedRow = new Array(rowArrayLength).fill('');
   const existingRow = rows[rowIndex - 1] || [];
+
   for (let i = 0; i < rowArrayLength; i++) {
     normalizedRow[i] = existingRow[i] ?? '';
   }
 
+  // set status
   normalizedRow[statusIdx] = status;
 
+  // apply any extraFields (e.g. parentEmail)
   for (const [fieldName, fieldValue] of Object.entries(extraFields)) {
     const idx = findHeaderIndex(header, fieldName);
     if (idx !== -1) {
@@ -166,8 +204,8 @@ async function updateStatusBySessionId(sessionId, status, extraFields = {}) {
   const lastColumn = columnNumberToLetter(rowArrayLength || 1);
   const sheets = getSheetsClient();
   await sheets.spreadsheets.values.update({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `Registrations!A${rowIndex}:${lastColumn}${rowIndex}`,
+    spreadsheetId: SHEET_ID,
+    range: `${TAB_NAME}!A${rowIndex}:${lastColumn}${rowIndex}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [normalizedRow] },
   });
