@@ -582,7 +582,7 @@
     return items;
   }
 
-  function gatherRegistrationData(){
+ function gatherRegistrationData() {
   const data = {
     parent: {
       firstName: $("#parentFirstName").value,
@@ -591,6 +591,12 @@
       phone:     $("#parentPhone").value,
       billingAddress: $("#billingAddress").value
     },
+    // root-level address fields so Apps Script can read them
+    address: $("#address").value,
+    city:    $("#city").value,
+    state:   $("#state").value,
+    zip:     $("#zip").value,
+
     campers: [],
     total: parseFloat($("#total").textContent || "0")
   };
@@ -598,20 +604,21 @@
   const num = parseInt($("#numCampers").value, 10) || 0;
   for (let i = 1; i <= num; i++) {
     data.campers.push({
-      firstName:       document.querySelector(`[name="childFirst${i}"]`)?.value || "",
-      lastName:        document.querySelector(`[name="childLast${i}"]`)?.value  || "",
-      birthdate:       document.querySelector(`[name="birthdate${i}"]`)?.value  || "",
-      age:             document.querySelector(`[name="childAge${i}"]`)?.value   || "",
-      beforeCare:      document.querySelector(`input[data-kind="before"][data-i="${i}"]`)?.checked || false,
-      afterCare:       document.querySelector(`input[data-kind="after"][data-i="${i}"]`)?.checked  || false,
-      hotLunch:        document.querySelector(`input[name="lunch${i}"]:checked`)?.value === "6",
-      hasAllergies:    document.querySelector(`input[name="allergy${i}"]:checked`)?.value === "yes",
-      allergyDetails:  document.getElementById(`allergyDetails${i}`)?.value || ""
+      firstName:      document.querySelector(`[name="childFirst${i}"]`)?.value || "",
+      lastName:       document.querySelector(`[name="childLast${i}"]`)?.value  || "",
+      birthdate:      document.querySelector(`[name="birthdate${i}"]`)?.value  || "",
+      age:            document.querySelector(`[name="childAge${i}"]`)?.value   || "",
+      beforeCare:     document.querySelector(`input[data-kind="before"][data-i="${i}"]`)?.checked || false,
+      afterCare:      document.querySelector(`input[data-kind="after"][data-i="${i}"]`)?.checked  || false,
+      hotLunch:       document.querySelector(`input[name="lunch${i}"]:checked`)?.value === "6",
+      hasAllergies:   document.querySelector(`input[name="allergy${i}"]:checked`)?.value === "yes",
+      allergyDetails: document.getElementById(`allergyDetails${i}`)?.value || ""
     });
   }
 
   return data;
 }
+
 
   /* ===== INIT ===== */
   (function init(){
