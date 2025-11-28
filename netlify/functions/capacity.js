@@ -3,30 +3,27 @@ const { getSheet } = require('./_sheets.js');
 
 exports.handler = async () => {
   try {
+    // This now reads Winter2025 via _sheets.js
     const rows = await getSheet();
 
+    // helper to normalize column keys
     const normalizeKey = value => (value || '').toString().replace(/[^a-z0-9]/gi, '').toLowerCase();
-    const matchesColumn = (key, targets) => {
-      const normalizedKey = normalizeKey(key);
-      const list = Array.isArray(targets) ? targets : [targets];
-      return list.some(target => {
-        const normalizedTarget = normalizeKey(target);
-        return normalizedKey === normalizedTarget || normalizedKey.endsWith(normalizedTarget);
-      });
-    };
 
-    const statusValue = row => {
+    const statusFromRow = row => {
       for (const [key, value] of Object.entries(row || {})) {
-        if (matchesColumn(key, ['Status', 'PaymentStatus'])) {
+        const k = normalizeKey(key);
+        if (k === 'status' || k.endsWith('status')) {
           return (value || '').toString().trim().toUpperCase();
         }
       }
       return '';
     };
 
-    const paid = rows.filter(r =>
-      ['PAID', 'PENDING'].includes(statusValue(r))
-    ).length;
+    // count PAID + PENDING rows in Winter2025
+    const paid = rows.filter(r => {
+      const s = statusFromRow(r);
+      return s === 'PAID' || s === 'PENDING';
+    }).length;
 
     const capacity = Number(process.env.CAPACITY) || 40;
 
@@ -35,7 +32,7 @@ exports.handler = async () => {
       body: JSON.stringify({ paid, capacity }),
     };
   } catch (err) {
-    console.error(err);
+    console.error('capacity error', err);
     return { statusCode: 500, body: err.toString() };
   }
 };

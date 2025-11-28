@@ -3,7 +3,7 @@ const { google } = require('googleapis');
 
 // HARD-CODED for Winter 2025
 const SHEET_ID = '1h4CeyR0wIt59HUDhXvMPQfLpAydfytJYRc9tjAXatkw';
-const TAB_NAME = 'Winter2025';
+const TAB_NAME = 'Winter2025';        // matches your tab name in the Winter 2025 sheet
 
 function getSheetsClient() {
   const jwt = new google.auth.JWT(
@@ -15,14 +15,14 @@ function getSheetsClient() {
   return google.sheets({ version: 'v4', auth: jwt });
 }
 
+// ---------- normalizers ----------
+
 function normalizeHeaderValue(value) {
   return (value || '').toString().trim();
 }
-
 function normalizeCellValue(value) {
   return (value || '').toString().trim();
 }
-
 function normalizeForComparison(value) {
   return normalizeHeaderValue(value).replace(/[^a-z0-9]/gi, '').toLowerCase();
 }
@@ -30,32 +30,26 @@ function normalizeForComparison(value) {
 function headerMatches(headerValue, target) {
   return normalizeForComparison(headerValue) === normalizeForComparison(target);
 }
-
 function headerMatchesSuffix(headerValue, suffix) {
   const normalized = normalizeForComparison(headerValue);
-  return (
-    normalized === normalizeForComparison(suffix) ||
-    normalized.endsWith(normalizeForComparison(suffix))
-  );
+  const tgt = normalizeForComparison(suffix);
+  return normalized === tgt || normalized.endsWith(tgt);
 }
 
 function findHeaderIndex(headerRow, target) {
   if (!Array.isArray(headerRow)) return -1;
-
   const targets = Array.isArray(target) ? target : [target];
 
-  // First pass: exact matches
-  for (const candidate of targets) {
-    const idx = headerRow.findIndex(h => headerMatches(h, candidate));
+  // exact match first
+  for (const t of targets) {
+    const idx = headerRow.findIndex(h => headerMatches(h, t));
     if (idx !== -1) return idx;
   }
-
-  // Second pass: suffix matches (e.g. "Stripe Session Id" -> "SessionID")
-  for (const candidate of targets) {
-    const idx = headerRow.findIndex(h => headerMatchesSuffix(h, candidate));
+  // then suffix match
+  for (const t of targets) {
+    const idx = headerRow.findIndex(h => headerMatchesSuffix(h, t));
     if (idx !== -1) return idx;
   }
-
   return -1;
 }
 
@@ -70,37 +64,30 @@ function columnNumberToLetter(num) {
   return result || 'A';
 }
 
-/**
- * Read all values from Winter2025!A:Z
- */
+// ---------- core helpers ----------
+
 async function fetchSheetValues() {
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: `${TAB_NAME}!A:Z`,
+    range: `${TAB_NAME}!A:AD`,   // covers your 30 columns
   });
   const rows = res.data.values || [];
   const header = rows[0] || [];
   return { header, rows };
 }
 
-/**
- * Append one row to Winter2025
- */
 async function appendRow(values) {
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
-    range: `${TAB_NAME}!A:Z`,
+    range: `${TAB_NAME}!A:AD`,
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [values] },
   });
   return res.data;
 }
 
-/**
- * Find a row by SessionID (in Winter2025)
- */
 async function findRowBySessionId(sessionId) {
   const { header, rows } = await fetchSheetValues();
   const idx = findHeaderIndex(header, 'SessionID');
@@ -116,22 +103,16 @@ async function findRowBySessionId(sessionId) {
   return { rowIndex: -1, headerIndex: idx, header, rows };
 }
 
-/**
- * Update a full row (by 1-based index) in Winter2025
- */
 async function updateRow(rowIndex, values) {
   const sheets = getSheetsClient();
   await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
-    range: `${TAB_NAME}!A${rowIndex}:Z${rowIndex}`,
+    range: `${TAB_NAME}!A${rowIndex}:AD${rowIndex}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [values] },
   });
 }
 
-/**
- * Return all rows as array of objects keyed by header
- */
 async function getSheet() {
   const { header, rows } = await fetchSheetValues();
   if (rows.length <= 1) return [];
@@ -142,14 +123,12 @@ async function getSheet() {
     for (let i = 0; i < normalizedHeader.length; i++) {
       const key = normalizedHeader[i] || `Column${i + 1}`;
       obj[key] = normalizeCellValue(row[i]);
+      // rows shorter than header just get '' for missing cells
     }
     return obj;
   });
 }
 
-/**
- * Same as getSheet but also returns the actual row index in the sheet
- */
 async function listRegistrationsWithRowIndex() {
   const { header, rows } = await fetchSheetValues();
   if (rows.length <= 1) return [];
@@ -161,13 +140,10 @@ async function listRegistrationsWithRowIndex() {
       const key = normalizedHeader[i] || `Column${i + 1}`;
       data[key] = normalizeCellValue(row[i]);
     }
-    return { rowIndex: idx + 2, data };
+    return { rowIndex: idx + 2, data }; // +2 because header + 1-based
   });
 }
 
-/**
- * Flip Status / PaymentStatus for a given Stripe session
- */
 async function updateStatusBySessionId(sessionId, status, extraFields = {}) {
   const { rowIndex, headerIndex, header, rows } = await findRowBySessionId(sessionId);
   if (rowIndex === -1) {
@@ -190,10 +166,10 @@ async function updateStatusBySessionId(sessionId, status, extraFields = {}) {
     normalizedRow[i] = existingRow[i] ?? '';
   }
 
-  // set status
+  // flip status
   normalizedRow[statusIdx] = status;
 
-  // apply any extraFields (e.g. parentEmail)
+  // optional extra fields (like Parent Email)
   for (const [fieldName, fieldValue] of Object.entries(extraFields)) {
     const idx = findHeaderIndex(header, fieldName);
     if (idx !== -1) {

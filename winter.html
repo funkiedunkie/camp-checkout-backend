@@ -442,6 +442,8 @@
     if(!parentEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail)){
       alert("Please enter a valid email address."); return;
     }
+localStorage.setItem("parentEmail", parentEmail);
+
     if(!parentPhone || parentPhone.replace(/[^\d]/g,"").length < 7){
       alert("Please enter a valid phone number."); return;
     }
